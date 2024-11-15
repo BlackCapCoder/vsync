@@ -51,6 +51,7 @@ struct World
   const float pspeed;
 
   TexObj tex;
+  float tx, ty;
 };
 
 World mkWorld ()
@@ -60,6 +61,8 @@ World mkWorld ()
     , .py = 0
     , .psize  = 100
     , .pspeed = 10
+    , .tx = 0
+    , .ty = 0
     };
 }
 
@@ -183,7 +186,7 @@ TexObj load_texture (char * pth)
 void init_textures ()
 {
   /*glGenerateMipmap(GL_TEXTURE_2D);*/
-  const auto tex = load_texture ("res/tilesets/girder.png");
+  const auto tex = load_texture ("res/tilesets/grass.png");
   world.tex = tex;
 }
 
@@ -230,13 +233,13 @@ void display ()
       glBindTexture (GL_TEXTURE_2D, world.tex);
 
       const auto s = 128.0;
-      const auto tw = 1.0; // 8.0/48.0;
-      const auto th = 1.0; // 8.0/120.0;
+      const auto tw = 8.0/48.0;
+      const auto th = 8.0/120.0;
 
       const auto x = 2.0;
       const auto y = 2.0;
-      const auto tx = 0.0;
-      const auto ty = 0.0;
+      const auto tx = world.tx;
+      const auto ty = world.ty;
 
       draw_tile (tw,th,s,tx,ty,s*x,s*y);
 
@@ -257,23 +260,28 @@ struct V2
 };
 
 template <class N>
-V2 <N> get_movement ()
+V2 <N> get_movement (char n, char e, char s, char w)
 {
   V2 <N> move { .x = 0, .y = 0 };
 
-  if (key_pressed ('S')) move.x -= 1;
-  if (key_pressed ('F')) move.x += 1;
-  if (key_pressed ('E')) move.y -= 1;
-  if (key_pressed ('D')) move.y += 1;
+  if (key_pressed (w)) move.x -= 1;
+  if (key_pressed (e)) move.x += 1;
+  if (key_pressed (n)) move.y -= 1;
+  if (key_pressed (s)) move.y += 1;
 
   return move;
 }
 
 void tick ()
 {
-  const auto move = get_movement <float> ();
+  const auto move = get_movement <float> ('E','F','D','S');
   world.px += move.x * world.pspeed;
   world.py += move.y * world.pspeed;
+
+  const float tspeed = 0.1;
+  const auto tmove = get_movement <float> ('K','L','J','H');
+  world.tx += tmove.x * tspeed;
+  world.ty += tmove.y * tspeed;
 }
 
 // ----
@@ -286,14 +294,6 @@ size_t get_time_chrono ()
   const auto x = now.time_since_epoch().count();
   return x;
 }
-
-// size_t get_time_asm ()
-// {
-//   return __rdtsc ();
-// }
-
-// --------
-
 
 // -----
 
