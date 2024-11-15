@@ -12,7 +12,9 @@
 #include <iostream>
 #include <thread>
 #include <map>
-#include <x86intrin.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "libs/stb_image.h"
 
 
 // -----
@@ -36,6 +38,9 @@ struct KeyMapEntry
 
 // ----
 
+using TexObj =
+  unsigned int;
+
 struct World
 {
   tick_t elapsed_ticks = 0;
@@ -44,6 +49,8 @@ struct World
   float px, py;
   const float psize;
   const float pspeed;
+
+  TexObj tex;
 };
 
 World mkWorld ()
@@ -153,6 +160,62 @@ void drawRectSz (float w, float h)
 
 
 
+TexObj load_texture (char * pth)
+{
+  unsigned int tex;
+  glGenTextures (1, &tex);
+  glBindTexture (GL_TEXTURE_2D, tex);
+  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  int width, height, nchannels;
+  unsigned char * img = stbi_load (pth, &width, &height, &nchannels, 0);
+  glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+  stbi_image_free (img);
+
+  /*std::cout << width << ", " << height << std::endl;*/
+
+  return tex;
+}
+
+void init_textures ()
+{
+  /*glGenerateMipmap(GL_TEXTURE_2D);*/
+  const auto tex = load_texture ("res/tilesets/girder.png");
+  world.tex = tex;
+}
+
+void draw_tile (float tw, float th, float s, float tx, float ty, float x, float y)
+{
+  const auto x1 = x;
+  const auto x2 = x1+s;
+  const auto y1 = y;
+  const auto y2 = y1+s;
+
+  const auto tx1 = tx*tw;
+  const auto tx2 = tx1*tw;
+  const auto ty1 = ty*th;
+  const auto ty2 = ty1+th;
+
+  glBegin (GL_QUADS);
+  {
+    glTexCoord2f (tx1, ty1);
+    glVertex2f (x1, y1);
+    glTexCoord2f (tx2, ty1);
+    glVertex2f (x2, y1);
+    glTexCoord2f (tx2, ty2);
+    glVertex2f (x2, y2);
+    glTexCoord2f (tx1, ty2);
+    glVertex2f (x1, y2);
+  }
+  glEnd ();
+}
+
+
+// ----
+
 void display ()
 {
   glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -160,9 +223,30 @@ void display ()
   {
     glColor4f (1.0, 0.0, 0.0, 1.0);
     drawRectPtSz (world.px, world.py, world.psize, world.psize);
+
+    glEnable (GL_TEXTURE_2D);
+    {
+      glColor3f (1,1,1);
+      glBindTexture (GL_TEXTURE_2D, world.tex);
+
+      const auto s = 128.0;
+      const auto tw = 1.0; // 8.0/48.0;
+      const auto th = 1.0; // 8.0/120.0;
+
+      const auto x = 2.0;
+      const auto y = 2.0;
+      const auto tx = 0.0;
+      const auto ty = 0.0;
+
+      draw_tile (tw,th,s,tx,ty,s*x,s*y);
+
+    }
+    glDisable (GL_TEXTURE_2D);
+
   }
   glPopMatrix();
 }
+
 
 // ----
 
@@ -203,10 +287,15 @@ size_t get_time_chrono ()
   return x;
 }
 
-size_t get_time_asm ()
-{
-  return __rdtsc ();
-}
+// size_t get_time_asm ()
+// {
+//   return __rdtsc ();
+// }
+
+// --------
+
+
+// -----
 
 
 int main ()
@@ -252,26 +341,30 @@ int main ()
   }
   /*glXGetCurrentDisplay();*/
 
+  {
+    init_textures ();
+  }
+
   glfwSetTime (0.0);
 
 
   static constexpr bool verbose = false;
 
-  auto before = get_time_asm ();
+  auto before = get_time_chrono ();
 
   while (!glfwWindowShouldClose (win))
   {
     glfwPollEvents ();
     tick ();
     display ();
-    auto middle = get_time_asm ();
+    auto middle = get_time_chrono ();
 
 
     glFlush ();
     glfwSwapBuffers (win);
     world.elapsed_ticks++;
 
-    auto after = get_time_asm ();
+    auto after = get_time_chrono ();
 
     const auto dt1 = middle - before;
     const auto dt2 = after  - before;
