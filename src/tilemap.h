@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include "V2.h"
+#include <optional>
 
 // ----
 
@@ -39,10 +40,11 @@ bool trit_bool (Trit a, bool b)
   }
 }
 
+
 // the input lists should have the same length!
-bool match (bool x [], Trit pat [])
+bool match (const bool x [8], const Trit pat [8])
 {
-  for (int i = 0; i < sizeof (x); i++)
+  for (int i = 0; i < 8; i++)
   {
     if (!trit_bool(pat[i], x[i])) return false;
   }
@@ -196,4 +198,45 @@ Rule <V2 <int>> rules [] =
       , I, I, O }, V2 <int> {4, 14} }
   };
 
+std::optional<V2<int>> doRules (const bool x [8])
+{
+  for (int i = 0; i < 8; i++)
+  {
+    const auto rule = rules[i];
+    if (match (x, rule.pat)) return std::optional<V2<int>> {rule.res};
+  }
+  return std::nullopt;
+}
+
+bool solid (TileMap tm, V2<int> pos)
+{
+  if (pos.x < 0 || pos.x >= tm.size.x || pos.y < 0 || pos.y >= tm.size.y) return true;
+  return tm.tiles[pos.y * tm.size.x + pos.x] != 0;
+}
+
+std::optional<V2<int>> auto_tile (TileMap tm, V2<int> pos)
+{
+  const auto q = solid (tm, pos);
+  if (!q) return std::nullopt;
+
+  const V2<int> pts [8] =
+    { V2<int> {-1, -1}
+    , V2<int> {0,-1}
+    , V2<int> {1,-1}
+    , V2<int> {-1,0}
+    , V2<int> {1,0}
+    , V2<int> {-1,1}
+    , V2<int> {0,1}
+    , V2<int> {1,1}
+    };
+
+  bool ns [8];
+  for (int i = 0; i < 8; i++)
+  {
+    const auto off = pts[i];
+    ns[i] = solid (tm, V2 <int> {pos.x + off.x, pos.y + off.y});
+  }
+
+  return doRules (ns);
+}
 
