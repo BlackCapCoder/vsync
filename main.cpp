@@ -1,6 +1,11 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 #include <cstdio>
+#include <thread>
+#include <atomic>
+#include <chrono>
+
+using namespace std::literals;
 
 #include "src/task.h"
 
@@ -8,6 +13,17 @@ constexpr int width  = 800;
 constexpr int height = 600;
 const char * title   = "Boilerplate!";
 constexpr auto asp   = static_cast<float>(width / static_cast<float>(height));
+
+std::atomic_bool input_loop{true};
+
+void handle_input(GLFWwindow * w)
+{
+  while (input_loop) {
+    if (glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+      printf("Yup\n");
+    std::this_thread::sleep_for(10ms);
+  }
+}
 
 void resize_callback(GLFWwindow *, int w, int h)
 {
@@ -153,6 +169,8 @@ int main()
   // Use the shader program
   glUseProgram(shaderProgram);
 
+  std::thread input(handle_input, win);
+
   while (!glfwWindowShouldClose(win)) {
     glfwPollEvents();
 
@@ -164,7 +182,12 @@ int main()
     glDrawArrays(GL_TRIANGLES, 0, 3); // Draw 3 vertices as a triangle
 
     glfwSwapBuffers(win);
+    printf("Sleeping for 2s\n");
+    std::this_thread::sleep_for(2s);
   }
+
+  input_loop = false;
+  input.join();
 
   // Delete the VBO and VAO- good practice I guess
   glDeleteVertexArrays(1, &VAO);
