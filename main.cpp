@@ -2,6 +2,8 @@
 #include <GLFW/glfw3.h>
 #include <cstdio>
 
+#include "src/task.h"
+
 constexpr int width  = 800;
 constexpr int height = 600;
 const char * title   = "Boilerplate!";
@@ -25,8 +27,25 @@ const char* fragmentShaderSource = "#version 330 core\n"
     "    FragColor = vec4(0.2f, 0.3f, 0.3f, 1.0f);\n"
     "}\n";
 
+void key_callback (GLFWwindow * win, int key, int scancode, int action, int mods);
+void key_callback (GLFWwindow * win, int key, int scancode, int action, int mods)
+{
+  if (action != GLFW_PRESS)
+    return;
+
+  if (key == GLFW_KEY_ESCAPE || key == 'Q')
+  {
+    glfwSetWindowShouldClose (win, GLFW_TRUE);
+    return;
+  }
+
+}
+
+
 int main()
 {
+  testTask ();
+
   glfwInit();
   // 3.3 core
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -38,6 +57,8 @@ int main()
     printf("Failed to create window...\n");
     return -1;
   }
+
+  glfwSetKeyCallback (win, key_callback);
 
   glfwMakeContextCurrent(win);
   glfwSetFramebufferSizeCallback(win, resize_callback);
@@ -144,3 +165,4 @@ int main()
 
   glfwTerminate();
 }
+
