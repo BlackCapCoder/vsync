@@ -7,10 +7,17 @@
 constexpr int width  = 800;
 constexpr int height = 600;
 const char * title   = "Boilerplate!";
+constexpr auto asp   = static_cast<float>(width / static_cast<float>(height));
 
-void resize_callback(GLFWwindow *, int width, int height)
+void resize_callback(GLFWwindow *, int w, int h)
 {
-  glViewport(0, 0, width, height);
+  int w2 = w, h2 = h;
+  if (w > static_cast<int>(h * asp))
+    w2 = static_cast<int>(h * asp);
+  else
+    h2 = static_cast<int>(w / asp);
+
+  glViewport((w - w2) / 2, (h - h2) / 2, w2, h2);
 }
 
 const char* vertexShaderSource = "#version 330 core\n"
