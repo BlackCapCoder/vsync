@@ -240,3 +240,7 @@ std::optional<V2<int>> auto_tile (TileMap tm, V2<int> pos)
   return doRules (ns);
 }
 
+// ----------
+
+
+

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -I./include/ -framework OpenGL -Wall -Wextra -pedantic
+CXXFLAGS = -std=c++20 -I./include/ OpenGL -Wall -Wextra -pedantic
 LDFLAGS = -lglfw
 SRC_DIR = src
 BUILD_DIR = build
