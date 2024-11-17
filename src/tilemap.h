@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include "V2.h"
+#include <cstring>
 #include <optional>
 #include <iostream>
 #include <vector>
@@ -272,6 +273,7 @@ TileMap pop_tilemap (FILE * s)
   int h = pop_int (s);
 
   // I don't know why I need the +1, is C 0-terminating? What the crap!
+  // I ask for N, but it gives me N-1 and a 0..?
   void * tiles = malloc (w*h+1);
   fgets(reinterpret_cast<char *>(tiles), w*h+1, s);
   return TileMap
@@ -293,5 +295,75 @@ std::vector<TileMap> load_tilemaps (const char * pth)
   }
   fclose(f);
   return v;
+}
+
+// -----
+
+char * flavor (TileMap & tm)
+{
+  const int size = tm.size.x * tm.size.y;
+
+  char * buf = reinterpret_cast<char *>(malloc(size));
+  for (int i = 0; i < size; i++)
+  {
+    buf[i] = (tm.tiles[i] == 0) ? 0 : 14;
+  }
+
+  char * tmp = reinterpret_cast<char *>(malloc(size));
+  for (int j = 0; j < 2; j++)
+  {
+    memcpy(tmp, buf, size);
+    for (int y=0; y < tm.size.y; y++)
+    {
+      for (int x=0; x < tm.size.x; x++)
+      {
+        const int i = y*tm.size.x+x;
+        const char a = buf[i];
+        if (! (a > 1)) continue;
+
+        const V2<int> offs [4] =
+          { V2<int> {0, -1}
+          , V2<int> {-1, 0}
+          , V2<int> {1,0}
+          , V2<int> {0,1}
+          };
+
+        int b = 14;
+        for (const auto [ox, oy] : offs)
+        {
+          const int x2 = x+ox;
+          const int y2 = x+oy;
+          const int i2 = y2*tm.size.x+x2;
+          const int b2 =
+            (x2 < 0 || x2 >= tm.size.x || y2 < 0 || y2 >= tm.size.y)
+            ? 14
+            : tmp[i2];
+          if (b > b2) b = b2;
+        }
+        b++;
+
+        if (! (a > b)) continue;
+        buf[i] = b;
+      }
+    }
+  }
+  free(tmp);
+
+  for (int y=0; y < tm.size.y; y++)
+  {
+    for (int x=0; x < tm.size.x; x++)
+    {
+      const int i = y*tm.size.x+x;
+      const char a = buf[i];
+      switch (a)
+      {
+        case 1: buf[i] = (x+y) % 4;
+        case 2: buf[i] = (x+y) % 10;
+        default: break;
+      }
+    }
+  }
+
+  return buf;
 }
 

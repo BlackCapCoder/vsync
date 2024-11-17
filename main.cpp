@@ -188,19 +188,27 @@ int main ()
       for (auto & tm : tms)
       {
         /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
+
+        const auto flv = flavor(tm);
+
         for (int y = 0; y < tm.size.y; y++)
         {
           for (int x = 0; x < tm.size.x; x++)
           {
-            /*if (!solid(tm, {x,y})) continue;*/
-
             const auto q = auto_tile (tm, {x, y});
             if (! q.has_value ()) continue;
-            const auto [tx, ty] = q.value();
+            auto [tx, ty] = q.value();
+
+            const int i = y*tm.size.x+x;
+            const auto fl = flv[i];
+
+            if (tx == 5) ty = fl;
+            if (tx == 0) tx = fl;
 
             /*std::cout << "tile: " << x << ", " << y << " | " << tx << ", " << ty << std::endl;*/
 
-            const auto & tex = texs[tm[{x,y}]-1];
+            const auto j = tm.tiles[i];
+            const auto & tex = texs[j-1];
             tex.use();
 
             auto model_ = glm::translate(model, {tm.pos.x+x, tm.pos.y+y, 0});
@@ -210,6 +218,8 @@ int main ()
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
           }
         }
+
+        free (flv);
       }
 
       glfwSwapBuffers(window);
