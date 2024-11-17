@@ -357,8 +357,8 @@ char * flavor (TileMap & tm)
       const char a = buf[i];
       switch (a)
       {
-        case 1: buf[i] = (x+y) % 4;
-        case 2: buf[i] = (x+y) % 10;
+        case 1: buf[i] = (x+y) % 4; break;
+        case 2: buf[i] = (x+y) % 10; break;
         default: break;
       }
     }
