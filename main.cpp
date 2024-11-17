@@ -112,12 +112,23 @@ int main ()
     return -1;
   }
 
-  auto tms = load_tilemaps ("lvl");
-  std::cout << "got " << tms.size() << " tilemaps!" << std::endl;
-
   // build and compile our shader zprogram
   // ------------------------------------
   shader = Shader ("shaders/4.1.texture.vs", "shaders/4.1.texture.fs");
+
+
+  // Each tile in the `lvl` file is either 0 if the tile is empty,
+  // or 1+the index of the tileset to use, in the order of the `texs`
+  // array below.
+  //
+  // The `load_tilemaps` function automatically applies autotiling rules
+  // to figure out which individual tile to use from within the given tileset.
+  //
+  // We could do the autotiling in the render loop instead, but it's sort of expensive
+  // and hopefully they won't change at runtime.
+  //
+  auto tms = load_tilemaps ("lvl");
+  std::cout << "got " << tms.size() << " tilemaps!" << std::endl;
 
   Texture texs [] =
     { Texture ("res/tilesets/girder.png")
