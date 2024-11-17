@@ -332,7 +332,7 @@ char * flavor (TileMap & tm)
         for (const auto [ox, oy] : offs)
         {
           const int x2 = x+ox;
-          const int y2 = x+oy;
+          const int y2 = y+oy;
           const int i2 = y2*tm.size.x+x2;
           const int b2 =
             (x2 < 0 || x2 >= tm.size.x || y2 < 0 || y2 >= tm.size.y)
