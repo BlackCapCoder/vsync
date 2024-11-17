@@ -64,16 +64,21 @@ bool key_pressed (int key)
 }
 
 template <class T>
+T get_move (char l, char r)
+{
+  T move = 0;
+  if (key_pressed (l)) move -= 1;
+  if (key_pressed (r)) move += 1;
+  return move;
+}
+
+template <class T>
 V2 <T> get_movement (char n, char e, char s, char w)
 {
-  V2 <T> move { .x = 0, .y = 0 };
-
-  if (key_pressed (w)) move.x -= 1;
-  if (key_pressed (e)) move.x += 1;
-  if (key_pressed (n)) move.y -= 1;
-  if (key_pressed (s)) move.y += 1;
-
-  return move;
+  return V2 <T>
+    { .x = get_move <T> (w, e)
+    , .y = get_move <T> (n, s)
+    };
 }
 
 // ----
@@ -241,10 +246,24 @@ void processInput(GLFWwindow *window)
   if (glfwGetKey(window, 'Q') == GLFW_PRESS)
       glfwSetWindowShouldClose(window, true);
 
+  const float zoom_speed = 0.5;
+  cam.z += get_move <float> ('O', 'I') * zoom_speed;
+
   const auto move = get_movement <float> ('E','F','D','S');
-  const float speed = 0.3;
+  float speed = 0.3;
+
+  if (cam.z > 0)
+  {
+    speed *= 1.0 - cam.z/32.0;
+  }
+  else
+  {
+    speed *= 1.0 + (-cam.z)/32.0;
+  }
+
   cam.x += move.x * speed;
   cam.y += move.y * speed;
+
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
