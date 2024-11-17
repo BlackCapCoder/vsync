@@ -5,10 +5,12 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
+#include <vector>
 
 #include "src/texture.h"
 #include "src/shader.h"
 #include "src/V2.h"
+#include "src/tilemap.h"
 
 // ----------
 
@@ -20,7 +22,7 @@ unsigned int window_height = 600;
 
 GLFWwindow * window;
 Shader shader;
-glm::vec3 cam {};
+glm::vec3 cam { 0.0, 0.0, 0.0 };
 
 // ----------
 
@@ -99,7 +101,7 @@ int main ()
     return -1;
   }
   glfwMakeContextCurrent(window);
-  glfwSwapInterval (2);
+  glfwSwapInterval (1);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
   // glad: load all OpenGL function pointers
@@ -110,14 +112,22 @@ int main ()
     return -1;
   }
 
+  std::vector<TileMap> tms = load_tilemaps ("lvl");
+  std::cout << "got tilemaps!" << std::endl;
+
   // build and compile our shader zprogram
   // ------------------------------------
   shader = Shader ("shaders/4.1.texture.vs", "shaders/4.1.texture.fs");
 
-  Texture tex ("res/tilesets/template.png");
+  Texture texs [] =
+    { Texture ("res/tilesets/girder.png")
+    , Texture ("res/tilesets/snow.png")
+    , Texture ("res/tilesets/dirt.png")
+    , Texture ("res/tilesets/cement.png")
+    };
 
-  const float tw = 8.0 / tex.width;
-  const float th = 8.0 / tex.height;
+  const float tw = 8.0 / texs[0].width;
+  const float th = 8.0 / texs[0].height;
 
   shader.use ();
   shader.setVec2("tile_size", tw, th);
@@ -167,29 +177,39 @@ int main ()
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      tex.use ();
+      /*tex.use ();*/
       shader.use ();
 
       glBindVertexArray(VAO);
 
+      glm::mat4 model = glm::mat4 (1.0f);
+      model = glm::translate(model, cam);
+
+      for (auto & tm : tms)
       {
-        glm::mat4 model = glm::mat4 (1.0f);
-        model = glm::translate(model, cam);
-        shader.setVec2("tile_pos", 0, 0);
-        shader.setMat4("model", model);
+        /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
+        for (int y = 0; y < tm.size.y; y++)
+        {
+          for (int x = 0; x < tm.size.x; x++)
+          {
+            /*if (!solid(tm, {x,y})) continue;*/
 
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-      }
+            const auto q = auto_tile (tm, {x, y});
+            if (! q.has_value ()) continue;
+            const auto [tx, ty] = q.value();
 
-      {
-        glm::mat4 model = glm::mat4 (1.0f);
-        model = glm::translate(model, cam);
-        model = glm::translate(model, {1.1, 0.0, 0.0});
+            /*std::cout << "tile: " << x << ", " << y << " | " << tx << ", " << ty << std::endl;*/
 
-        shader.setVec2("tile_pos", 0, 1);
-        shader.setMat4("model", model);
+            const auto & tex = texs[tm[{x,y}]-1];
+            tex.use();
 
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            auto model_ = glm::translate(model, {tm.pos.x+x, tm.pos.y+y, 0});
+            shader.setMat4("model", model_);
+            shader.setVec2("tile_pos", tx, ty);
+
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+          }
+        }
       }
 
       glfwSwapBuffers(window);
@@ -214,7 +234,7 @@ void processInput(GLFWwindow *window)
       glfwSetWindowShouldClose(window, true);
 
   const auto move = get_movement <float> ('E','F','D','S');
-  const float speed = 0.1;
+  const float speed = 0.3;
   cam.x += move.x * speed;
   cam.y += move.y * speed;
 }
@@ -234,7 +254,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glm::mat4 model = glm::mat4(1.0f);
 
     proj = glm::perspective(glm::radians(45.0f), (float)window_width / (float)window_height, 0.1f, 100.0f);
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -64.0f * 1.5f));
     view[1] *= -1.0;
 
     shader.setMat4("projection", proj );

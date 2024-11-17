@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstdio>
 #include <cstdlib>
 #include "V2.h"
 #include <optional>
+#include <iostream>
+#include <vector>
 
 // ----
 
@@ -11,8 +14,14 @@ using tile_t =
 
 struct TileMap
 {
+  V2 <int> pos;
   V2 <int> size;
   tile_t * tiles; 
+
+  tile_t & operator [] (V2<int> pos)
+  {
+    return tiles [pos.x + pos.y * size.x];
+  }
 };
 
 
@@ -40,8 +49,6 @@ bool trit_bool (Trit a, bool b)
   }
 }
 
-
-// the input lists should have the same length!
 bool match (const bool x [8], const Trit pat [8])
 {
   for (int i = 0; i < 8; i++)
@@ -200,9 +207,8 @@ Rule <V2 <int>> rules [] =
 
 std::optional<V2<int>> doRules (const bool x [8])
 {
-  for (int i = 0; i < 8; i++)
+  for (const auto rule : rules)
   {
-    const auto rule = rules[i];
     if (match (x, rule.pat)) return std::optional<V2<int>> {rule.res};
   }
   return std::nullopt;
@@ -211,7 +217,7 @@ std::optional<V2<int>> doRules (const bool x [8])
 bool solid (TileMap tm, V2<int> pos)
 {
   if (pos.x < 0 || pos.x >= tm.size.x || pos.y < 0 || pos.y >= tm.size.y) return true;
-  return tm.tiles[pos.y * tm.size.x + pos.x] != 0;
+  return tm[pos] != 0;
 }
 
 std::optional<V2<int>> auto_tile (TileMap tm, V2<int> pos)
@@ -236,11 +242,56 @@ std::optional<V2<int>> auto_tile (TileMap tm, V2<int> pos)
     const auto off = pts[i];
     ns[i] = solid (tm, V2 <int> {pos.x + off.x, pos.y + off.y});
   }
+  /*std::cout << ns[0] << ns[1] << ns[2] << '\n' << ns[3] << ' ' << ns[4] << '\n' << ns[5] << ns[6] << ns[7] << std::endl;*/
 
   return doRules (ns);
 }
 
-// ----------
+// ----
 
 
+int pop_int (FILE * s)
+{
+  int n = 0;
+  int sign = 1;
+  for (;;)
+  {
+    const char c = fgetc(s);
+    if (c == ';') break;
+    if (c == '-') { sign *= -1; continue; }
+    n = n * 10 + c - '0';
+  }
+  return n * sign;
+}
+
+TileMap pop_tilemap (FILE * s)
+{
+  int x = pop_int (s);
+  int y = pop_int (s);
+  int w = pop_int (s);
+  int h = pop_int (s);
+
+  // I don't know why I need the +1, is C 0-terminating? What the crap!
+  void * tiles = malloc (w*h+1);
+  fgets(reinterpret_cast<char *>(tiles), w*h+1, s);
+  return TileMap
+    { .pos   = {x, y}
+    , .size  = {w, h}
+    , .tiles = reinterpret_cast<tile_t *>(tiles)
+    };
+}
+
+std::vector<TileMap> load_tilemaps (const char * pth)
+{
+  FILE * f = fopen (pth, "r");
+  std::vector<TileMap> v {};
+  for (int i=0; i < 20; i++)
+  /*while (! feof(f))*/
+  {
+    v.push_back (pop_tilemap (f));
+    /*fgetc(f);*/
+  }
+  fclose(f);
+  return v;
+}
 
