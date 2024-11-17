@@ -219,6 +219,7 @@ int main ()
             auto model_ = glm::translate(model, {tm.pos.x+x, tm.pos.y+y, 0});
             shader.setMat4("model", model_);
             shader.setVec2("tile_pos", tile.tx, tile.ty);
+            // shader.setVec2("tile_pos", 0, 14); // What it looks like without auto-tiling
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
           }

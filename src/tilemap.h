@@ -250,6 +250,13 @@ std::optional<V2<int>> auto_tile (TileMap tm, V2<int> pos)
 
 // -----
 
+// Each tile has a few variations or "flavors". This function
+// psuedo-randomly chooses a flavor for each tile.
+//
+// The fill tiles (tiles that does not border with air)
+// come in different "intensities", and we want to reduce the intensity
+// the further the tile is from air.
+//
 char * flavor (const TileMap & tm)
 {
   const int size = tm.size.x * tm.size.y;
@@ -308,7 +315,7 @@ char * flavor (const TileMap & tm)
       const char a = buf[i];
       switch (a)
       {
-        case 1: buf[i] = (x+y) % 4; break;
+        case 1: buf[i] = (x+y) % 4; break;  // "psuedo-random" selection.
         case 2: buf[i] = (x+y) % 10; break;
         default: break;
       }
