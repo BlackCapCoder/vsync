@@ -21,8 +21,8 @@ unsigned int window_width  = 800;
 unsigned int window_height = 600;
 
 GLFWwindow * window;
-Shader shader;
-glm::vec3 cam { -20, -10, 0.0 };
+Shader shader, simple_shader;
+glm::vec3 cam { -20, -10, -20.0 };
 
 // ----------
 
@@ -83,6 +83,19 @@ V2 <T> get_movement (char n, char e, char s, char w)
 
 // ----
 
+struct Player
+{
+  V2 <float> pos;
+  V2 <float> vel;
+  static constexpr V2 <float> size = { 1.0, 1.0 };
+};
+
+Player player
+  { .pos = { 3, 16 }
+  };
+
+// ----
+
 int main ()
 {
   // glfw: initialize and configure
@@ -120,6 +133,7 @@ int main ()
   // build and compile our shader zprogram
   // ------------------------------------
   shader = Shader ("shaders/4.1.texture.vs", "shaders/4.1.texture.fs");
+  simple_shader = Shader ("shaders/simple.vs", "shaders/simple.fs");
 
 
   // Each tile in the `lvl` file is either 0 if the tile is empty,
@@ -134,6 +148,8 @@ int main ()
   //
   auto tms = load_tilemaps ("lvl");
   std::cout << "got " << tms.size() << " tilemaps!" << std::endl;
+  std::cout << tms[0].size.x << ", " << tms[0].size.y << std::endl;
+
 
   Texture texs [] =
     { Texture ("res/tilesets/girder.png")
@@ -193,37 +209,50 @@ int main ()
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      /*tex.use ();*/
-      shader.use ();
-
-      glBindVertexArray(VAO);
-
       glm::mat4 model = glm::mat4 (1.0f);
       model = glm::translate(model, cam);
 
-      for (auto & tm : tms)
+      // tilemap
+      if (1)
       {
-        /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
+        shader.use ();
+        glBindVertexArray(VAO);
 
-        for (int y = 0; y < tm.size.y; y++)
+        for (auto & tm : tms)
         {
-          for (int x = 0; x < tm.size.x; x++)
+          /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
+
+          for (int y = 0; y < tm.size.y; y++)
           {
-            const int i = y*tm.size.x+x;
-            const auto tile = tm.tiles[i];
-            if (tile.is_empty()) continue;
+            for (int x = 0; x < tm.size.x; x++)
+            {
+              const int i = y*tm.size.x+x;
+              const auto tile = tm.tiles[i];
+              if (tile.is_empty()) continue;
 
-            const auto & tex = texs[tile.get_tileset()];
-            tex.use();
+              const auto & tex = texs[tile.get_tileset()];
+              tex.use();
 
-            auto model_ = glm::translate(model, {tm.pos.x+x, tm.pos.y+y, 0});
-            shader.setMat4("model", model_);
-            shader.setVec2("tile_pos", tile.tx, tile.ty);
-            // shader.setVec2("tile_pos", 0, 14); // What it looks like without auto-tiling
+              auto model_ = glm::translate(model, {tm.pos.x+x, tm.pos.y+y, 0});
+              shader.setMat4("model", model_);
+              shader.setVec2("tile_pos", tile.tx, tile.ty);
+              // shader.setVec2("tile_pos", 0, 14); // What it looks like without auto-tiling
 
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+              glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            }
           }
         }
+
+      }
+
+      // player
+      {
+        simple_shader.use ();
+        glBindVertexArray (VAO);
+
+        auto model_ = glm::translate(model, {player.pos.x, player.pos.y, 0.0});
+        simple_shader.setMat4("model", model_);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
       }
 
       glfwSwapBuffers(window);
@@ -265,6 +294,11 @@ void processInput(GLFWwindow *window)
   cam.x += move.x * speed;
   cam.y += move.y * speed;
 
+  const auto pmove = get_movement <float> ('K','L','J','H');
+  const float pspeed = 0.1;
+
+  player.pos.x += pmove.x * pspeed;
+  player.pos.y += pmove.y * pspeed;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -285,8 +319,14 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     view = glm::translate(view, glm::vec3(0.0f, 0.0f, -64.0f * 0.5f));
     view[1] *= -1.0;
 
+    shader.use();
     shader.setMat4("projection", proj );
     shader.setMat4("view",       view );
     shader.setMat4("model",      model);
+
+    simple_shader.use();
+    simple_shader.setMat4("projection", proj );
+    simple_shader.setMat4("view",       view );
+    simple_shader.setMat4("model",      model);
   }
 }
