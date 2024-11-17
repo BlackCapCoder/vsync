@@ -248,58 +248,9 @@ std::optional<V2<int>> auto_tile (TileMap tm, V2<int> pos)
   return doRules (ns);
 }
 
-// ----
-
-
-int pop_int (FILE * s)
-{
-  int n = 0;
-  int sign = 1;
-  for (;;)
-  {
-    const char c = fgetc(s);
-    if (c == ';') break;
-    if (c == '-') { sign *= -1; continue; }
-    n = n * 10 + c - '0';
-  }
-  return n * sign;
-}
-
-TileMap pop_tilemap (FILE * s)
-{
-  int x = pop_int (s);
-  int y = pop_int (s);
-  int w = pop_int (s);
-  int h = pop_int (s);
-
-  // I don't know why I need the +1, is C 0-terminating? What the crap!
-  // I ask for N, but it gives me N-1 and a 0..?
-  void * tiles = malloc (w*h+1);
-  fgets(reinterpret_cast<char *>(tiles), w*h+1, s);
-  return TileMap
-    { .pos   = {x, y}
-    , .size  = {w, h}
-    , .tiles = reinterpret_cast<tile_t *>(tiles)
-    };
-}
-
-std::vector<TileMap> load_tilemaps (const char * pth)
-{
-  FILE * f = fopen (pth, "r");
-  std::vector<TileMap> v {};
-  for (int i=0; i < 20; i++)
-  /*while (! feof(f))*/
-  {
-    v.push_back (pop_tilemap (f));
-    /*fgetc(f);*/
-  }
-  fclose(f);
-  return v;
-}
-
 // -----
 
-char * flavor (TileMap & tm)
+char * flavor (const TileMap & tm)
 {
   const int size = tm.size.x * tm.size.y;
 
@@ -365,5 +316,130 @@ char * flavor (TileMap & tm)
   }
 
   return buf;
+}
+
+// ----
+
+struct TileInfo
+{
+  unsigned char
+  tileset, // 0=empty
+  tx, ty;  // position of the tile within the tileset
+
+  bool is_nonempty () const
+  {
+    return (bool) (tileset);
+  }
+  bool is_empty () const
+  {
+    return !(is_nonempty ());
+  }
+  int get_tileset () const
+  {
+    return tileset - 1;
+  }
+};
+
+struct TileMapEx : TileMap
+{
+  V2 <int> pos, size;
+  TileInfo * tiles; 
+
+  TileMapEx (const TileMap & tm)
+  {
+    pos  = tm.pos;
+    size = tm.size;
+
+    const int sz = size.x * size.y;
+    tiles = reinterpret_cast<TileInfo*>(malloc(sizeof(TileInfo) * sz));
+
+    char * flv = flavor(tm);
+
+    for (int y=0; y < tm.size.y; y++)
+    {
+      for (int x=0; x < tm.size.x; x++)
+      {
+        const int i = y*tm.size.x+x;
+        const auto q = auto_tile (tm, {x, y});
+        if (! q.has_value ())
+        {
+          tiles[i].tileset = 0;
+          continue;
+        }
+        auto [tx, ty] = q.value();
+        const auto fl = flv[i];
+
+        tiles[i].tileset = tm.tiles[i];
+        tiles[i].tx = (tx != 0) ? tx : fl;
+        tiles[i].ty = (tx != 5) ? ty : fl;
+      }
+    }
+
+    free (flv);
+  }
+};
+
+// ----
+
+
+int pop_int (FILE * s)
+{
+  int n = 0;
+  int sign = 1;
+  for (;;)
+  {
+    const char c = fgetc(s);
+    if (c == ';') break;
+    if (c == '-') { sign *= -1; continue; }
+    n = n * 10 + c - '0';
+  }
+  return n * sign;
+}
+
+V2<int> pop_int2 (FILE * s)
+{
+  return V2 <int>
+    { .x = pop_int (s)
+    , .y = pop_int (s)
+    };
+}
+
+TileMap pop_tilemap (FILE * s)
+{
+  auto pos  = pop_int2 (s);
+  auto size = pop_int2 (s);
+
+  // I don't know why I need the +1, is C 0-terminating? What the crap!
+  // I ask for N, but it gives me N-1 and a 0..?
+  const int sz = size.x * size.y + 1;
+  void * tiles = malloc (sz);
+  fgets(reinterpret_cast<char *>(tiles), sz, s);
+  return TileMap
+    { .pos   = pos
+    , .size  = size
+    , .tiles = reinterpret_cast<tile_t *>(tiles)
+    };
+}
+
+TileMapEx pop_tilemap_ex (FILE * s)
+{
+  TileMap tm = pop_tilemap (s);
+  TileMapEx tmx (tm);
+  free (tm.tiles);
+  return tmx;
+}
+
+std::vector<TileMapEx> load_tilemaps (const char * pth)
+{
+  FILE * f = fopen (pth, "r");
+  std::vector<TileMapEx> v {};
+  for (int i=0; i < 20; i++)
+  /*while (! feof(f))*/
+  {
+    v.push_back (pop_tilemap_ex (f));
+    /*fgetc(f);*/
+  }
+  fclose(f);
+  return v;
 }
 

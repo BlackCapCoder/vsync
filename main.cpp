@@ -22,7 +22,7 @@ unsigned int window_height = 600;
 
 GLFWwindow * window;
 Shader shader;
-glm::vec3 cam { 0.0, 0.0, 0.0 };
+glm::vec3 cam { -20, -10, 0.0 };
 
 // ----------
 
@@ -112,8 +112,8 @@ int main ()
     return -1;
   }
 
-  std::vector<TileMap> tms = load_tilemaps ("lvl");
-  std::cout << "got tilemaps!" << std::endl;
+  auto tms = load_tilemaps ("lvl");
+  std::cout << "got " << tms.size() << " tilemaps!" << std::endl;
 
   // build and compile our shader zprogram
   // ------------------------------------
@@ -189,37 +189,24 @@ int main ()
       {
         /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
 
-        const auto flv = flavor(tm);
-
         for (int y = 0; y < tm.size.y; y++)
         {
           for (int x = 0; x < tm.size.x; x++)
           {
-            const auto q = auto_tile (tm, {x, y});
-            if (! q.has_value ()) continue;
-            auto [tx, ty] = q.value();
-
             const int i = y*tm.size.x+x;
-            const auto fl = flv[i];
+            const auto tile = tm.tiles[i];
+            if (tile.is_empty()) continue;
 
-            if (tx == 5) ty = fl;
-            if (tx == 0) tx = fl;
-
-            /*std::cout << "tile: " << x << ", " << y << " | " << tx << ", " << ty << std::endl;*/
-
-            const auto j = tm.tiles[i];
-            const auto & tex = texs[j-1];
+            const auto & tex = texs[tile.get_tileset()];
             tex.use();
 
             auto model_ = glm::translate(model, {tm.pos.x+x, tm.pos.y+y, 0});
             shader.setMat4("model", model_);
-            shader.setVec2("tile_pos", tx, ty);
+            shader.setVec2("tile_pos", tile.tx, tile.ty);
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
           }
         }
-
-        free (flv);
       }
 
       glfwSwapBuffers(window);
@@ -264,7 +251,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glm::mat4 model = glm::mat4(1.0f);
 
     proj = glm::perspective(glm::radians(45.0f), (float)window_width / (float)window_height, 0.1f, 100.0f);
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -64.0f * 1.5f));
+    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -64.0f * 0.5f));
     view[1] *= -1.0;
 
     shader.setMat4("projection", proj );
