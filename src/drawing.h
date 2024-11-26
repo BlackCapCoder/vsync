@@ -46,8 +46,6 @@ TexObj load_texture (char * pth)
   glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
   stbi_image_free (img);
 
-  /*std::cout << width << ", " << height << std::endl;*/
-
   return tex;
 }
 

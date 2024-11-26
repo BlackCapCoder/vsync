@@ -5,8 +5,9 @@
 #include "V2.h"
 #include <cstring>
 #include <optional>
-#include <iostream>
+#include <stdexcept>
 #include <vector>
+#include <utility>
 
 // ----
 
@@ -15,9 +16,9 @@ using tile_t =
 
 struct TileMap
 {
-  V2 <int> pos;
+  V2 <int> pos{};
   V2 <int> size;
-  tile_t * tiles; 
+  tile_t * tiles;
 
   tile_t & operator [] (V2<int> pos)
   {
@@ -47,6 +48,7 @@ bool trit_bool (Trit a, bool b)
     case X: return true;
     case O: return !b;
     case I: return b;
+    default: throw std::runtime_error("Implement me");
   }
 }
 
@@ -60,7 +62,7 @@ bool match (const bool x [8], const Trit pat [8])
 }
 
 template <class T>
-struct Rule 
+struct Rule
 {
   Trit pat [8];
   T res;
@@ -350,7 +352,7 @@ struct TileInfo
 struct TileMapEx : TileMap
 {
   V2 <int> pos, size;
-  TileInfo * tiles; 
+  TileInfo * tiles;
 
   TileMapEx (const TileMap & tm)
   {

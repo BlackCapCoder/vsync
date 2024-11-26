@@ -6,7 +6,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <iostream>
+#include <fmt/core.h>
 
 struct Shader
 {
@@ -28,7 +28,7 @@ struct Shader
     vShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
     fShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
 
-    try 
+    try
     {
       // open files
       vShaderFile.open(vertexPath);
@@ -37,7 +37,7 @@ struct Shader
 
       // read file's buffer contents into streams
       vShaderStream << vShaderFile.rdbuf();
-      fShaderStream << fShaderFile.rdbuf();		
+      fShaderStream << fShaderFile.rdbuf();
 
       // close file handlers
       vShaderFile.close();
@@ -45,11 +45,11 @@ struct Shader
 
       // convert stream into string
       vertexCode = vShaderStream.str();
-      fragmentCode = fShaderStream.str();			
+      fragmentCode = fShaderStream.str();
     }
     catch (std::ifstream::failure& e)
     {
-      std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << e.what() << std::endl;
+      fmt::print("ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: {}\n", e.what());
     }
 
     const char * vShaderCode = vertexCode  .c_str();
@@ -85,8 +85,8 @@ struct Shader
   // activate the shader
   // ------------------------------------------------------------------------
   void use() const
-  { 
-    glUseProgram(ID); 
+  {
+    glUseProgram(ID);
   }
 
   GLint getLoc (const std::string & name) const
@@ -97,45 +97,45 @@ struct Shader
   // utility uniform functions
   // ------------------------------------------------------------------------
   void setBool(const std::string & name, bool value) const
-  {         
-    glUniform1i(getLoc (name), (int) value); 
+  {
+    glUniform1i(getLoc (name), (int) value);
   }
   // ------------------------------------------------------------------------
   void setInt(const std::string &name, int value) const
-  { 
-    glUniform1i(getLoc (name), value); 
+  {
+    glUniform1i(getLoc (name), value);
   }
   // ------------------------------------------------------------------------
   void setFloat(const std::string &name, float value) const
-  { 
-    glUniform1f(getLoc (name), value); 
+  {
+    glUniform1f(getLoc (name), value);
   }
   // ------------------------------------------------------------------------
   void setVec2(const std::string &name, const glm::vec2 &value) const
-  { 
-    glUniform2fv(getLoc (name), 1, &value[0]); 
+  {
+    glUniform2fv(getLoc (name), 1, &value[0]);
   }
   void setVec2(const std::string &name, float x, float y) const
-  { 
-    glUniform2f(getLoc (name), x, y); 
+  {
+    glUniform2f(getLoc (name), x, y);
   }
   // ------------------------------------------------------------------------
   void setVec3(const std::string &name, const glm::vec3 &value) const
-  { 
-    glUniform3fv(getLoc (name), 1, &value[0]); 
+  {
+    glUniform3fv(getLoc (name), 1, &value[0]);
   }
   void setVec3(const std::string &name, float x, float y, float z) const
-  { 
-    glUniform3f(getLoc (name), x, y, z); 
+  {
+    glUniform3f(getLoc (name), x, y, z);
   }
   // ------------------------------------------------------------------------
   void setVec4(const std::string &name, const glm::vec4 &value) const
-  { 
-    glUniform4fv(getLoc (name), 1, &value[0]); 
+  {
+    glUniform4fv(getLoc (name), 1, &value[0]);
   }
   void setVec4(const std::string &name, float x, float y, float z, float w) const
-  { 
-    glUniform4f(getLoc (name), x, y, z, w); 
+  {
+    glUniform4f(getLoc (name), x, y, z, w);
   }
   // ------------------------------------------------------------------------
   void setMat2(const std::string &name, const glm::mat2 &mat) const
@@ -167,7 +167,7 @@ private:
       if (!success)
       {
         glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-        std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+        fmt::print("ERROR::SHADER_COMPILATION_ERROR of type: {}\n{}\n -- --------------------------------------------------- -- ", type, infoLog);
       }
     }
     else
@@ -176,10 +176,9 @@ private:
       if (!success)
       {
         glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-        std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+        fmt::print("ERROR::PROGRAM_LINKING_ERROR of type: {}\n{}\n -- --------------------------------------------------- -- ", type, infoLog);
       }
     }
   }
 
 };
-

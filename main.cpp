@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <iostream>
+#include <fmt/core.h>
 #include <vector>
 
 #include "src/texture.h"
@@ -86,7 +86,7 @@ V2 <T> get_movement (char n, char e, char s, char w)
 struct Player
 {
   V2 <float> pos;
-  V2 <float> vel;
+  V2 <float> vel{};
   static constexpr V2 <float> size = { 1.0, 1.0 };
 };
 
@@ -114,7 +114,7 @@ int main ()
   window = glfwCreateWindow(window_width, window_height, "LearnOpenGL", NULL, NULL);
   if (window == NULL)
   {
-    std::cout << "Failed to create GLFW window" << std::endl;
+    fmt::print("Failed to create GLFW window\n");
     glfwTerminate();
     return -1;
   }
@@ -126,7 +126,7 @@ int main ()
   // ---------------------------------------
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
   {
-    std::cout << "Failed to initialize GLAD" << std::endl;
+    fmt::print("Failed to initialize GLAD\n");
     return -1;
   }
 
@@ -147,9 +147,8 @@ int main ()
   // and hopefully they won't change at runtime.
   //
   auto tms = load_tilemaps ("lvl");
-  std::cout << "got " << tms.size() << " tilemaps!" << std::endl;
-  std::cout << tms[0].size.x << ", " << tms[0].size.y << std::endl;
-
+  fmt::print("got {} tilemaps!\n", tms.size());
+  fmt::print("x: {}, y: {}\n", tms[0].size.x, tms[0].size.y);
 
   Texture texs [] =
     { Texture ("res/tilesets/girder.png")
@@ -172,10 +171,10 @@ int main ()
      0.5f,  0.5f, 0.0f, (1.0f), (1.0f), // top right
      0.5f, -0.5f, 0.0f, (1.0f), (0.0f), // bottom right
     -0.5f, -0.5f, 0.0f, (0.0f), (0.0f), // bottom left
-    -0.5f,  0.5f, 0.0f, (0.0f), (1.0f)  // top left 
+    -0.5f,  0.5f, 0.0f, (0.0f), (1.0f)  // top left
   };
   unsigned int indices [] =
-  {  
+  {
     0, 1, 3, // first triangle
     1, 2, 3  // second triangle
   };
@@ -220,8 +219,6 @@ int main ()
 
         for (auto & tm : tms)
         {
-          /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
-
           for (int y = 0; y < tm.size.y; y++)
           {
             for (int x = 0; x < tm.size.x; x++)
@@ -303,7 +300,7 @@ void processInput(GLFWwindow *window)
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow*, int width, int height)
 {
   window_width = width;
   window_height = height;
