@@ -1,5 +1,7 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -24,7 +26,7 @@ unsigned int window_height = 600;
 
 GLFWwindow * window;
 Shader shader, simple_shader;
-glm::vec3 cam { -20, -10, -20.0 };
+glm::vec3 cam { 0, 0, 0 };
 
 std::vector<TileMapEx> tilemaps;
 
@@ -259,7 +261,13 @@ int main ()
       glClear(GL_COLOR_BUFFER_BIT);
 
       glm::mat4 model = glm::mat4 (1.0f);
-      model = glm::translate(model, cam);
+      model = glm::translate(model, glm::vec3(cam.x,cam.y, 0.f));
+      {
+        const float mult  = 0.1f;
+        float scale = 1.f + cam.z * mult;
+
+        model = glm::scale(model, glm::vec3(scale, scale, 1.f));
+      }
 
       // tilemap
       if (1)
@@ -325,7 +333,7 @@ void processInput(GLFWwindow *window)
   if (glfwGetKey(window, 'Q') == GLFW_PRESS)
       glfwSetWindowShouldClose(window, true);
 
-  const float zoom_speed = 0.5;
+  const float zoom_speed = 0.1;
   cam.z += get_move <float> ('O', 'I') * zoom_speed;
 
 
@@ -364,9 +372,13 @@ void framebuffer_size_callback(GLFWwindow*, int width, int height)
     glm::mat4 proj  = glm::mat4(1.0f);
     glm::mat4 model = glm::mat4(1.0f);
 
-    proj = glm::perspective(glm::radians(45.0f), (float)window_width / (float)window_height, 0.1f, 100.0f);
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -64.0f * 0.5f));
-    view[1] *= -1.0;
+    proj = glm::ortho(0.f, (float) window_width, (float) window_height, 0.f, -1.f, 1.f);
+
+    const float scale = 32.f;
+    const float off = 1.0f * 16;
+
+    view = glm::translate(view, glm::vec3(off, off, 0.f));
+    view = glm::scale(view, glm::vec3(scale, scale, 1.f));
 
     shader.use();
     shader.setMat4("projection", proj );
