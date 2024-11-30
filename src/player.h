@@ -156,7 +156,7 @@ private:
       q0 = (a+c) - std::floor(a+c);
     else
     {
-      q0 = a - std::floorf (a);
+      q0 = a - std::floor (a);
       q0 = q0 == 0 ? -1 : -q0;
     }
     return q0 / b;
