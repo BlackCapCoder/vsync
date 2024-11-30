@@ -13,8 +13,8 @@ void main()
 	gl_Position = projection * view * model *
     vec4
     ( vec3
-      ( (aPos.x + 0.5) * size.x - 0.5
-      , (aPos.y + 0.5) * size.y - 0.5
+      ( (aPos.x) * size.x
+      , (aPos.y) * size.y
       , aPos.z )
     , 1.0);
 }
