@@ -23,7 +23,7 @@ bool hit_test (V2 <float> pos, V2 <float> size);
 struct Player
 {
   V2 <float> pos;
-  V2 <float> vel;
+  V2 <float> vel{};
   static constexpr V2 <float> size = { 0.7, 1.0 };
 
   Player (V2 <float> pos) : pos {pos}

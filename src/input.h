@@ -74,7 +74,7 @@ struct KeyMap
       oldE = newE;
     else
       return;
-    std::cout << time << std::endl;
+    /*std::cout << time << std::endl;*/
   }
 
   KeyMapEntry & get (int key)

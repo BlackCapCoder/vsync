@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++20 -I./include/ -Wall -Wextra -pedantic
-LDFLAGS = -lglfw -lglm
+LDFLAGS = -lglfw -lfmt
 SRC_DIR = src
 BUILD_DIR = build
 TARGET = $(BUILD_DIR)/main
