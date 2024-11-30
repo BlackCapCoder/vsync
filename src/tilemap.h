@@ -384,6 +384,11 @@ struct TileMapEx : TileMap
 
     free (flv);
   }
+
+  TileInfo & operator [] (V2<int> pos)
+  {
+    return tiles [pos.x + pos.y * size.x];
+  }
 };
 
 // ----

@@ -11,6 +11,8 @@
 #include "src/shader.h"
 #include "src/V2.h"
 #include "src/tilemap.h"
+#include "src/player.h"
+#include "src/input.h"
 
 // ----------
 
@@ -23,6 +25,8 @@ unsigned int window_height = 600;
 GLFWwindow * window;
 Shader shader, simple_shader;
 glm::vec3 cam { -20, -10, -20.0 };
+
+std::vector<TileMapEx> tilemaps;
 
 // ----------
 
@@ -64,37 +68,76 @@ bool key_pressed (int key)
 }
 
 template <class T>
-T get_move (char l, char r)
+bool pt_in_rect (V2 <T> p1, V2 <T> p2, V2 <T> size)
 {
-  T move = 0;
-  if (key_pressed (l)) move -= 1;
-  if (key_pressed (r)) move += 1;
-  return move;
+  if (p1.x < p2.x || p1.y < p2.y) return false;
+  const V2 <T> p3 { p2.x+size.x, p2.y+size.y };
+  if (p1.x >= p3.x || p1.y >= p3.y) return false;
+  return true;
 }
 
 template <class T>
-V2 <T> get_movement (char n, char e, char s, char w)
+bool rect_in_rect (V2 <T> p1, V2 <T> s1, V2 <T> p2, V2 <T> s2)
 {
-  return V2 <T>
-    { .x = get_move <T> (w, e)
-    , .y = get_move <T> (n, s)
-    };
+  return std::max(p1.x, p2.x) < std::min(p1.x + s1.x, p2.x + s2.x)
+      && std::max(p1.y, p2.y) < std::min(p1.y + s1.y, p2.y + s2.y);
+}
+
+bool hit_test_int (V2 <int> pos)
+{
+  for (auto tm : tilemaps)
+  {
+    if (pt_in_rect <int> (pos, tm.pos, tm.size))
+    {
+      const V2 <int> lpos { pos.x - tm.pos.x, pos.y - tm.pos.y };
+      const auto & tile = tm[lpos];
+      return tile.is_nonempty();
+    }
+  }
+  return false;
+}
+
+bool hit_test (V2 <float> pos)
+{
+  return hit_test_int ({(int) pos.x, (int) pos.y});
+}
+
+bool hit_test (V2 <float> p1, V2 <float> s1)
+{
+  for (auto tm : tilemaps)
+  {
+    const V2 <float> p2 { (float) tm.pos.x,  (float) tm.pos.y  };
+    const V2 <float> s2 { (float) tm.size.x, (float) tm.size.y };
+    if (rect_in_rect (p1,s1,p2,s2))
+    {
+      const int x0 = std::max<int>((int) p1.x, tm.pos.x);
+      const int y0 = std::max<int>((int) p1.y, tm.pos.y);
+      const int x1 = std::min<int>((int) (p1.x + s1.x), tm.pos.x + tm.size.x);
+      const int y1 = std::min<int>((int) (p1.y + s1.y), tm.pos.y + tm.size.x);
+
+      for (int y = y0; y <= y1; y++)
+      {
+        for (int x = x0; x <= x1; x++)
+        {
+          const auto & tile = tm[{x, y}];
+          if (tile.is_nonempty())
+            return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 // ----
 
-struct Player
-{
-  V2 <float> pos;
-  V2 <float> vel;
-  static constexpr V2 <float> size = { 1.0, 1.0 };
-};
-
 Player player
-  { .pos = { 3, 16 }
-  };
+  (V2<float>{ 3, 16 }
+  );
 
 // ----
+
+void key_callback (GLFWwindow * win, int key, int scancode, int action, int mods);
 
 int main ()
 {
@@ -109,6 +152,7 @@ int main ()
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
+
   // glfw window creation
   // --------------------
   window = glfwCreateWindow(window_width, window_height, "LearnOpenGL", NULL, NULL);
@@ -118,6 +162,10 @@ int main ()
     glfwTerminate();
     return -1;
   }
+
+  glfwSetInputMode (window, GLFW_STICKY_KEYS, GLFW_TRUE);
+  glfwSetKeyCallback (window, key_callback);
+
   glfwMakeContextCurrent(window);
   glfwSwapInterval (1);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -146,9 +194,9 @@ int main ()
   // We could do the autotiling in the render loop instead, but it's sort of expensive
   // and hopefully they won't change at runtime.
   //
-  auto tms = load_tilemaps ("lvl");
-  std::cout << "got " << tms.size() << " tilemaps!" << std::endl;
-  std::cout << tms[0].size.x << ", " << tms[0].size.y << std::endl;
+  tilemaps = load_tilemaps ("lvl");
+  std::cout << "got " << tilemaps.size() << " tilemaps!" << std::endl;
+  std::cout << tilemaps[0].size.x << ", " << tilemaps[0].size.y << std::endl;
 
 
   Texture texs [] =
@@ -206,6 +254,8 @@ int main ()
     {
       processInput(window);
 
+      player.tick ();
+
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
 
@@ -218,7 +268,7 @@ int main ()
         shader.use ();
         glBindVertexArray(VAO);
 
-        for (auto & tm : tms)
+        for (auto & tm : tilemaps)
         {
           /*std::cout << tm.pos.x << ", " << tm.pos.y << std::endl;*/
 
@@ -252,11 +302,13 @@ int main ()
 
         auto model_ = glm::translate(model, {player.pos.x, player.pos.y, 0.0});
         simple_shader.setMat4("model", model_);
+        simple_shader.setVec2("size", player.size.x, player.size.y);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
       }
 
       glfwSwapBuffers(window);
       glfwPollEvents();
+      global::ticks_elapsed++;
     }
 
     glDeleteVertexArrays(1, &VAO);
@@ -279,7 +331,13 @@ void processInput(GLFWwindow *window)
   const float zoom_speed = 0.5;
   cam.z += get_move <float> ('O', 'I') * zoom_speed;
 
-  const auto move = get_movement <float> ('E','F','D','S');
+
+  V2 <float> move { 0.0, 0.0 };
+  if (key_pressed (GLFW_KEY_LEFT )) move.x -= 1.0;
+  if (key_pressed (GLFW_KEY_RIGHT)) move.x += 1.0;
+  if (key_pressed (GLFW_KEY_UP )) move.y -= 1.0;
+  if (key_pressed (GLFW_KEY_DOWN)) move.y += 1.0;
+
   float speed = 0.3;
 
   if (cam.z > 0)
@@ -293,12 +351,6 @@ void processInput(GLFWwindow *window)
 
   cam.x += move.x * speed;
   cam.y += move.y * speed;
-
-  const auto pmove = get_movement <float> ('K','L','J','H');
-  const float pspeed = 0.1;
-
-  player.pos.x += pmove.x * pspeed;
-  player.pos.y += pmove.y * pspeed;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -330,3 +382,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     simple_shader.setMat4("model",      model);
   }
 }
+
+void key_callback (GLFWwindow * win, int key, int scancode, int action, int mods)
+{
+  global::keymap.put (global::ticks_elapsed, key,scancode,action,mods);
+}
+
