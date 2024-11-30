@@ -218,10 +218,10 @@ int main ()
   float vertices [20] =
   {
     // positions        // texture coords
-     0.5f,  0.5f, 0.0f, (1.0f), (1.0f), // top right
-     0.5f, -0.5f, 0.0f, (1.0f), (0.0f), // bottom right
-    -0.5f, -0.5f, 0.0f, (0.0f), (0.0f), // bottom left
-    -0.5f,  0.5f, 0.0f, (0.0f), (1.0f)  // top left
+    1.0f, 1.0f, 0.0f, (1.0f), (1.0f), // top right
+    1.0f, 0.0f, 0.0f, (1.0f), (0.0f), // bottom right
+    0.0f, 0.0f, 0.0f, (0.0f), (0.0f), // bottom left
+    0.0f, 1.0f, 0.0f, (0.0f), (1.0f)  // top left
   };
   unsigned int indices [] =
   {
@@ -338,12 +338,12 @@ void processInput(GLFWwindow *window)
 
 
   V2 <float> move { 0.0, 0.0 };
-  if (key_pressed (GLFW_KEY_LEFT )) move.x -= 1.0;
-  if (key_pressed (GLFW_KEY_RIGHT)) move.x += 1.0;
-  if (key_pressed (GLFW_KEY_UP )) move.y -= 1.0;
-  if (key_pressed (GLFW_KEY_DOWN)) move.y += 1.0;
+  if (key_pressed (GLFW_KEY_LEFT )) move.x += 1.0;
+  if (key_pressed (GLFW_KEY_RIGHT)) move.x -= 1.0;
+  if (key_pressed (GLFW_KEY_UP )) move.y += 1.0;
+  if (key_pressed (GLFW_KEY_DOWN)) move.y -= 1.0;
 
-  float speed = 0.3;
+  float speed = 0.3 *  0.02;
 
   if (cam.z > 0)
   {
@@ -374,10 +374,7 @@ void framebuffer_size_callback(GLFWwindow*, int width, int height)
 
     proj = glm::ortho(0.f, (float) window_width, (float) window_height, 0.f, -1.f, 1.f);
 
-    const float scale = 32.f;
-    const float off = 1.0f * 16;
-
-    view = glm::translate(view, glm::vec3(off, off, 0.f));
+    const float scale = (float) window_width / 40;
     view = glm::scale(view, glm::vec3(scale, scale, 1.f));
 
     shader.use();
