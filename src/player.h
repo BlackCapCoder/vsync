@@ -25,6 +25,7 @@ struct Player
   V2 <float> pos;
   V2 <float> vel{};
   static constexpr V2 <float> size = { 0.7, 1.0 };
+  int direction = 1;
 
   Player (V2 <float> pos) : pos {pos}
   {
@@ -68,8 +69,8 @@ private:
   void do_dash ()
   {
     if (! key_pressed('K')) return;
-    vel.x = 40;
-    vel.y = 0;
+    vel.x = 40 * direction;
+    // vel.y = 0;
   }
 
   // ----
@@ -263,6 +264,8 @@ private:
 
     const auto m_sign = signum (mx);
     const auto v_sign = signum (vx);
+
+    direction = mx;
 
     if (mx == 0)
     {
