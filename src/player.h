@@ -46,24 +46,21 @@ struct Player
   void tick ()
   {
     do_grounding ();
-    do_dash ();
+
+    if (dash_state == NotDashing)
+      do_dash ();
+    else if (dash_state == DirectionPending)
+      on_dash_dir_pending ();
+
     do_jumping ();
+
+    if (dash_state == Dashing)
+      on_dashing ();
 
     if (dash_state == NotDashing)
     {
-      normal_update ();
-    }
-    else if (dash_state == DirectionPending)
-    {
-      on_dash_dir_pending ();
-    }
-
-    if (dash_state == Dashing)
-    {
-      on_dashing ();
-
-      if (dash_state == NotDashing)
-        normal_update ();
+      do_walking ();
+      do_gravity ();
     }
 
     // just for debugging
@@ -71,9 +68,7 @@ struct Player
       vel.y = -10;
 
     if (dash_state != DirectionPending)
-    {
       apply_velocity ();
-    }
   }
 
 private:
