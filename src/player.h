@@ -46,6 +46,8 @@ struct Player
   void tick ()
   {
     do_grounding ();
+    do_dash ();
+    do_jumping ();
 
     if (dash_state == NotDashing)
     {
@@ -55,8 +57,6 @@ struct Player
     {
       on_dash_dir_pending ();
     }
-
-    do_jumping ();
 
     if (dash_state == Dashing)
     {
@@ -82,7 +82,6 @@ private:
   {
     do_walking ();
     do_gravity ();
-    do_dash ();
   }
 
   // ----
