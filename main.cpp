@@ -296,14 +296,22 @@ int main ()
 
   // set up vertex data (and buffer(s)) and configure vertex attributes
   // ------------------------------------------------------------------
-  float vertices [20] =
+  float vertices [] =
   {
-    // positions        // texture coords
-    1.0f, 1.0f, 0.0f, (1.0f), (1.0f), // top right
-    1.0f, 0.0f, 0.0f, (1.0f), (0.0f), // bottom right
-    0.0f, 0.0f, 0.0f, (0.0f), (0.0f), // bottom left
-    0.0f, 1.0f, 0.0f, (0.0f), (1.0f)  // top left
+    1.0f, 1.0f,
+    1.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 1.0f,
   };
+
+  float tertices [] =
+  {
+    1.f, 1.f,
+    1.f, 0.f,
+    0.f, 0.f,
+    0.f, 1.f
+  };
+
   unsigned int indices [] =
   {
     0, 1, 3, // first triangle
@@ -315,6 +323,7 @@ int main ()
     glGenVertexArrays(1, &VAO);
 
     GlBuf vbo (GL_ARRAY_BUFFER);
+    GlBuf tbo (GL_ARRAY_BUFFER);
     GlBuf ebo (GL_ELEMENT_ARRAY_BUFFER);
 
     glBindVertexArray(VAO);
@@ -323,11 +332,12 @@ int main ()
     ebo.fill (indices);
 
     // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
     glEnableVertexAttribArray(0);
 
     // texture coord attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    tbo.fill (tertices);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
     glEnableVertexAttribArray(1);
 
     // -------------------------
