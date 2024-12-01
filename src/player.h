@@ -98,9 +98,11 @@ private:
   static constexpr tick_t dash_duration = 120 * .15f;
   static constexpr tick_t dash_cooldown = 120 * .2f; // time before we can dash again
   static constexpr tick_t dash_refresh_time = 120 * .1f; // time before we can get our dash back
+  static constexpr tick_t dash_bounce_time = 120 * .3f; // time to input a wallbounce after a dash
   tick_t dash_timeout;
   tick_t dash_cooldown_timeout;
   tick_t dash_refresh_timeout;
+  tick_t dash_bounce_timeout;
 
   static constexpr float dash_speed = 240.f / 8.f;
   static constexpr float dash_up_mult = .75f;
@@ -148,6 +150,7 @@ private:
   {
     dash_state = Dashing;
     dash_timeout = global::ticks_elapsed + dash_duration;
+    dash_bounce_timeout = global::ticks_elapsed + dash_bounce_time;
 
     if (dash_direction.x == 0 && dash_direction.y == 0)
       dash_direction.x = facing;
@@ -578,7 +581,6 @@ private:
   static constexpr float
     ultra_boost = 1.2;
 
-
   bool do_jumping ()
   {
     if (! has_key_buffered (jump_key)) return false;
@@ -587,10 +589,9 @@ private:
       return false;
     if (! is_grounded)
     {
-      if (time_ungrounded + cayotee_time < global::ticks_elapsed)
-        return false;
-      if (time_ungrounded <= time_last_jump) // you only get 1 jump!
-        return false;
+      if ( time_ungrounded + cayotee_time < global::ticks_elapsed
+        || time_ungrounded <= time_last_jump // you only get 1 jump!
+         ) return try_wallbounce ();
 
       std::cout << "cayotee jump" << std::endl;
     }
@@ -638,6 +639,41 @@ private:
     {
       vel.x *= ultra_boost;
     }
+
+    return true;
+  }
+
+  static constexpr float
+    wallbounce_wall_dist = 0.3f;
+  static constexpr float
+    wallbounce_speed_y = 28.f;
+  static constexpr float
+    wallbounce_speed_x = 24.f;
+
+  bool try_wallbounce ()
+  {
+    if (vel.x != 0 || vel.y >= 0)
+      return false;
+
+    if (global::ticks_elapsed > dash_bounce_timeout)
+      return false;
+
+    const int wall_dir
+      = hit_test ({pos.x - wallbounce_wall_dist, pos.y}, {wallbounce_wall_dist, size.y})
+      ? -1
+      : hit_test ({pos.x + size.x, pos.y}, {wallbounce_wall_dist, size.y})
+      ? +1
+      : 0;
+
+    if (wall_dir == 0)
+      return false;
+
+    dash_state = NotDashing;
+    dash_bounce_timeout = 0;
+
+    time_last_jump = global::ticks_elapsed;
+    vel.x = -wallbounce_speed_x * wall_dir;
+    vel.y = -wallbounce_speed_y;
 
     return true;
   }
