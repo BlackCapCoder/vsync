@@ -386,7 +386,7 @@ int main ()
         if (player.dash_state == Player::DirectionPending)
           simple_shader.setVec3 ("color", 1.f, 1.f, 1.f);
         else if (player.n_dashes == 0)
-          simple_shader.setVec3 ("color", 0.f, 0.f, 1.f);
+          simple_shader.setVec3 ("color", 0.4f, 0.4f, 1.f);
         else
           simple_shader.setVec3 ("color", 1.f, 0.f, 0.f);
 

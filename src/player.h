@@ -288,12 +288,14 @@ private:
   // when hitting something, wait a few frames before killing the speed.
   // if we have both x and y velocity we can sort of slide around corners
   // and keep our speed
-  static constexpr int slide_grace = 10;
+  static constexpr int slide_grace = 8;
   int x_slide = 0;
   int y_slide = 0;
 
-  // if we have only x or y speed, try jiggling slightly in the other direction
-  static constexpr float corner_correction = 0.25f;
+  // if we have only x or y speed, try jiggling slightly on the other axis
+  static constexpr float corner_correction_slow = 0.2f;
+  static constexpr float corner_correction_fast = 0.45f;
+  static constexpr float corner_correction_fast_vel = 22.f;
 
   void apply_velocity ()
   {
@@ -315,10 +317,16 @@ private:
         pos = new_pos;
       else if (vel.y == 0)
       {
-        if (const V2 <float> p {new_pos.x, new_pos.y - corner_correction}; ! hit_test (p, size))
-          { pos = p; moveY(+corner_correction); } else
-        if (const V2 <float> p {new_pos.x, new_pos.y + corner_correction}; ! hit_test (p, size))
-          { pos = p; moveY(-corner_correction); }
+        const float c
+          = std::abs(vel.x) < corner_correction_fast_vel
+          ? corner_correction_slow
+          : corner_correction_fast
+          ;
+
+        if (const V2 <float> p {new_pos.x, new_pos.y - c}; !hit_test (p, size))
+          { pos = p; moveY(+c); } else
+        if (const V2 <float> p {new_pos.x, new_pos.y + c}; !hit_test (p, size))
+          { pos = p; moveY(-c); }
         else
         {
           moveX (vel.x * scale);
@@ -327,10 +335,17 @@ private:
       }
       else if (vel.x == 0)
       {
-        if (const V2 <float> p {new_pos.x - corner_correction, new_pos.y}; ! hit_test (p, size))
-          { pos = p; moveX(+corner_correction); } else
-        if (const V2 <float> p {new_pos.x + corner_correction, new_pos.y}; ! hit_test (p, size))
-          { pos = p; moveX(-corner_correction); }
+        const float c
+          = std::abs(vel.y) < corner_correction_fast_vel
+         || vel.y > 0 // don't want to slip into the pit!
+          ? corner_correction_slow
+          : corner_correction_fast
+          ;
+
+        if (const V2 <float> p {new_pos.x - c, new_pos.y}; !hit_test (p, size))
+          { pos = p; moveX(+c); } else
+        if (const V2 <float> p {new_pos.x + c, new_pos.y}; !hit_test (p, size))
+          { pos = p; moveX(-c); }
         else
         {
           moveY (vel.y * scale);
@@ -460,7 +475,7 @@ private:
 
   static constexpr float walk_max = 90.f / 8;
   static constexpr float walk_accel = 1;
-  static constexpr float walk_reduce = 0.4;
+  static constexpr float walk_reduce = 400.f / (8 * 120);
   static constexpr float walk_stopping = 0.03;
   static constexpr float fric_ground = 1.0;
   static constexpr float fric_air = 0.65;
