@@ -144,9 +144,9 @@ bool hit_test (V2 <float> p1, V2 <float> s1)
 //   (V2<float>{ 3, 16 }
 //   );
 
-int current_screen = 10;
+int current_screen = 12;
 Player player
-  (V2<float>{ 122+10, -151 + 19 }
+  (V2<float>{ 82+10, -174 + 17 }
   );
 
 int get_current_screen ()
@@ -182,6 +182,9 @@ void main_tick ()
     current_screen = new_screen;
     const auto tm = tilemaps[current_screen];
     fmt::print("new screen: {}, {}, {}\n", current_screen, tm.pos.x, tm.pos.y);
+
+    global::ticks_to_skip = 20; // sleep a bit after changing screens
+    player.n_dashes = 1;
   }
 
   {

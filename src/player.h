@@ -24,7 +24,7 @@ struct Player
 {
   V2 <float> pos;
   V2 <float> vel{};
-  static constexpr V2 <float> size = { 0.7, 1.0 };
+  static constexpr V2 <float> size = { 7.9/8.0, 11.0/8.0 };
   int facing = 1;
   int n_dashes = 1;
 
@@ -73,14 +73,6 @@ struct Player
 
 private:
 
-  void normal_update ()
-  {
-    do_walking ();
-    do_gravity ();
-  }
-
-  // ----
-
   static constexpr tick_t input_buffer_frames =
     8;
     /*10;*/
@@ -103,15 +95,16 @@ private:
   static constexpr tick_t freeze_time = 5;
   V2 <int> dash_direction;
 
-  static constexpr tick_t dash_duration = 25;
-  static constexpr tick_t dash_cooldown = 10; // time before we can dash again
-  static constexpr tick_t dash_refresh_time = 10; // time before we can get our dash back
+  static constexpr tick_t dash_duration = 120 * .15f;
+  static constexpr tick_t dash_cooldown = 120 * .2f; // time before we can dash again
+  static constexpr tick_t dash_refresh_time = 120 * .1f; // time before we can get our dash back
   tick_t dash_timeout;
   tick_t dash_cooldown_timeout;
   tick_t dash_refresh_timeout;
 
-  static constexpr float dash_speed = 30;
-  static constexpr float dash_y_mult = 0.7f;
+  static constexpr float dash_speed = 240.f / 8.f;
+  static constexpr float dash_up_mult = .75f;
+  static constexpr float end_dash_speed = 160.f / 8.f;
 
   V2 <float> dash_vel;
 
@@ -167,24 +160,27 @@ private:
 
     if (dash_direction.y < 0)
     {
-      dash_vel.x *= dash_y_mult;
-      dash_vel.y *= dash_y_mult;
+      dash_vel.x *= dash_up_mult;
+      dash_vel.y *= dash_up_mult;
     }
 
     // dashing in the direction you're already going should never slow you down
     if (signum(dash_vel.x) == signum(vel.x) && abs(vel.x) > abs(dash_vel.x)) dash_vel.x = vel.x;
     if (signum(dash_vel.y) == signum(vel.y) && abs(vel.y) > abs(dash_vel.y)) dash_vel.y = vel.y;
+
+    vel.x = dash_vel.x;
+    vel.y = dash_vel.y;
   }
   void on_dashing ()
   {
     // we could do this once in `begin_dash`, but doing it every frame
     // allows wrapping around corners.
-    {
-      vel.x = dash_vel.x;
-      vel.y = dash_vel.y;
-    }
+    // {
+    //   vel.x = dash_vel.x;
+    //   vel.y = dash_vel.y;
+    // }
 
-    if (global::ticks_elapsed >= dash_timeout)
+    if (global::ticks_elapsed > dash_timeout)
       end_dash ();
   }
   void end_dash ()
@@ -192,9 +188,11 @@ private:
     dash_state = NotDashing;
     if (dash_direction.y < 1)
     {
-      vel.x = 0;
-      vel.y = 0;
+      vel.x = dash_direction.x * end_dash_speed;
+      vel.y = dash_direction.y * end_dash_speed;
     }
+    if (vel.y < 0)
+      vel.y *= dash_up_mult;
   }
 
   // ----
@@ -287,7 +285,16 @@ private:
     return q0 / b;
   }
 
-  // TODO: naively kills all velocity
+  // when hitting something, wait a few frames before killing the speed.
+  // if we have both x and y velocity we can sort of slide around corners
+  // and keep our speed
+  static constexpr int slide_grace = 10;
+  int x_slide = 0;
+  int y_slide = 0;
+
+  // if we have only x or y speed, try jiggling slightly in the other direction
+  static constexpr float corner_correction = 0.25f;
+
   void apply_velocity ()
   {
     if (vel.x == 0 && vel.y == 0)
@@ -299,47 +306,116 @@ private:
       , pos.y + vel.y * scale
       };
 
-    if (! hit_test (new_pos, size))
+    // ---- no collision, or no collision after corner correction
+
     {
-      pos = new_pos;
-      return;
-    }
+      bool ok = true;
 
-    /*float step = moveStep (vel.x, vel.y);*/
-    /*V2 <float> res { pos.x + vel.x*step, pos.y + vel.y*step };*/
-
-    const auto old_pos = pos;
-    const int itts = moveXY (vel.x * scale, vel.y * scale);
-
-
-    if ( old_pos.x != pos.x &&
-         new_pos.x != pos.x &&
-       ! hit_test ({new_pos.x, pos.y}, size)
-    ) pos.x = new_pos.x;
-    else if
-      ( old_pos.y != pos.y &&
-        new_pos.y != pos.y &&
-      ! hit_test ({pos.x, new_pos.y}, size)
-    ) pos.y = new_pos.y;
-
-    if (old_pos.x == pos.x)
-      vel.x = 0;
-
-    if (old_pos.y == pos.y)
-      vel.y = 0;
-    else if (vel.y > 0 && pos.y != new_pos.y)
-    {
-      if (! is_grounded)
+      if (! hit_test (new_pos, size))
+        pos = new_pos;
+      else if (vel.y == 0)
       {
-        is_grounded = true;
-        on_grounded ();
-        if (do_jumping ())
+        if (const V2 <float> p {new_pos.x, new_pos.y - corner_correction}; ! hit_test (p, size))
+          { pos = p; moveY(+corner_correction); } else
+        if (const V2 <float> p {new_pos.x, new_pos.y + corner_correction}; ! hit_test (p, size))
+          { pos = p; moveY(-corner_correction); }
+        else
         {
-          apply_velocity ();
-          std::cout << "bonus jump" << std::endl;
+          moveX (vel.x * scale);
+          vel.x = 0;
         }
       }
+      else if (vel.x == 0)
+      {
+        if (const V2 <float> p {new_pos.x - corner_correction, new_pos.y}; ! hit_test (p, size))
+          { pos = p; moveX(+corner_correction); } else
+        if (const V2 <float> p {new_pos.x + corner_correction, new_pos.y}; ! hit_test (p, size))
+          { pos = p; moveX(-corner_correction); }
+        else
+        {
+          moveY (vel.y * scale);
+          vel.y = 0;
+        }
+      }
+      else ok = false;
+
+      if (ok) return;
     }
+
+    // ---- collision and velocity in both directions, crap!
+
+    bool x_moved, x_more, y_moved, y_more;
+
+    // jiggle towards the target as much as possible,
+    // we'll get stuck on at least one axis
+    {
+      const auto old_pos = pos;
+      moveXY (vel.x * scale, vel.y * scale);
+
+      x_moved = pos.x != old_pos.x;
+      x_more  = pos.x != new_pos.x;
+
+      y_moved = pos.y != old_pos.y;
+      y_more  = pos.y != new_pos.y;
+
+      if ( x_moved
+        && x_more
+        && ! hit_test ({new_pos.x, pos.y}, size)
+         ) { pos.x = new_pos.x; x_more = false; }
+      else if
+         ( y_moved
+        && y_more
+        && ! hit_test ({pos.x, new_pos.y}, size)
+         ) { pos.y = new_pos.y; y_more = false; }
+    }
+
+    // if only one axis did not move at all, wait a few frames before
+    // killing its velocity- the axis that does move might get us unstuck!
+    //
+    // TODO: refund lost mileage upon getting unstuck?
+    //
+    {
+      if (x_moved)
+        x_slide = 0;
+      else if (y_moved && x_slide < slide_grace)
+        x_slide++;
+      else
+      {
+        /*if (y_moved) std::cout << "killed vel.x\n";*/
+        vel.x = 0;
+        x_slide = 0;
+      }
+
+      if (y_moved)
+        y_slide = 0;
+      else if (x_moved && y_slide < slide_grace)
+        y_slide++;
+      else
+      {
+        /*if (x_moved) std::cout << "killed vel.y\n";*/
+        vel.y = 0;
+        y_slide = 0;
+      }
+    }
+
+    // not required and probably doesn't belong here,
+    // but if we're going to jump immediately at the beginning of the next frame,
+    // we might as well do it now so the user doesn't have to wait!
+    if ( y_moved
+      && y_more
+      && vel.y > 0
+      && ! is_grounded
+       )
+    {
+      is_grounded = true;
+      on_grounded ();
+      if (do_jumping ())
+      {
+        apply_velocity ();
+        std::cout << "early jump" << std::endl;
+      }
+    }
+
   }
 
   // ----
@@ -382,13 +458,16 @@ private:
 
   // ----
 
-  static constexpr float walk_max = 10;
+  static constexpr float walk_max = 90.f / 8;
   static constexpr float walk_accel = 1;
+  static constexpr float walk_reduce = 0.4;
   static constexpr float walk_stopping = 0.03;
+  static constexpr float fric_ground = 1.0;
+  static constexpr float fric_air = 0.65;
 
   float get_friction ()
   {
-    return is_grounded ? 1.0 : 0.3;
+    return is_grounded ? fric_ground : fric_air;
   }
   /*const auto move = get_movement <float> ('E','F','D','S');*/
 
@@ -422,7 +501,7 @@ private:
     else
     {
       const auto fric = get_friction ();
-      const auto vx2  = vx - v_sign * fric;
+      const auto vx2  = vx - v_sign * fric * walk_reduce;
       vx = vx2*v_sign < walk_max ? walk_max*v_sign : vx2;
     }
 
@@ -434,15 +513,20 @@ private:
   static constexpr float gravity_max = 30;
   static constexpr float gravity_accel = 1.0;
 
+  // We want `jump_liftoff` to be small so that if we quickly tap jump
+  // we barely move off the ground, but we also want to be able to jump high!
+  // Delay gravity for a few frames while jump is held.
+  static constexpr int zero_grav_time = 15;
+
   float get_gravity ()
   {
     float g = gravity_accel;
-    if (key_pressed_(jump_key)) // half gravity while holding jump
+    if (key_pressed_ (jump_key)) // half gravity while holding jump
     {
-      if (global::ticks_elapsed - time_last_jump <= 10)
+      if (global::ticks_elapsed - time_last_jump <= zero_grav_time)
         g = 0;
       else
-      g *= 0.5;
+        g *= 0.5;
     }
     return g;
   }
@@ -459,22 +543,26 @@ private:
 
   // grace period where you can still jump after having left the ground
   static constexpr tick_t
-    cayotee_time = input_buffer_frames;
+    cayotee_time =
+    // input_buffer_frames
+    5
+    ;
 
   tick_t time_last_jump = 0;
 
   static constexpr float
+    /*jump_liftoff = 15;*/
     jump_liftoff = 13;
 
   static constexpr float
-    super_boost = 1.2;
+    super_speed = 260.f / 8;
   static constexpr float
-    hyper_boost = 1.4;
+    hyper_x_mult = 1.25;
+  static constexpr float
+    hyper_y_mult = 0.5;
   static constexpr float
     ultra_boost = 1.2;
 
-  static constexpr float
-    hyper_y_mult = 0.5;
 
   bool do_jumping ()
   {
@@ -507,7 +595,8 @@ private:
       if (dash_direction.x == 0)
         return true;
 
-      vel.x = dash_vel.x;
+      //vel.x = dash_vel.x;
+      vel.x = super_speed * dash_direction.x;
 
       // allows reversing supers and hypers
       {
@@ -521,13 +610,12 @@ private:
 
       if (dash_direction.y > 0)
       {
-        vel.x *= hyper_boost;
+        vel.x *= hyper_x_mult;
         vel.y *= hyper_y_mult;
         std::cout << "hyper" << std::endl;
       }
       else
       {
-        vel.x *= super_boost;
         std::cout << "super" << std::endl;
       }
     }
