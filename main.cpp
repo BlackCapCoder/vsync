@@ -112,16 +112,21 @@ bool hit_test (V2 <float> p1, V2 <float> s1)
     const V2 <float> s2 { (float) tm.size.x, (float) tm.size.y };
     if (rect_in_rect (p1,s1,p2,s2))
     {
-      const int x0 = std::max<int>((int) p1.x, tm.pos.x);
-      const int y0 = std::max<int>((int) p1.y, tm.pos.y);
-      const int x1 = std::min<int>((int) (p1.x + s1.x), tm.pos.x + tm.size.x);
-      const int y1 = std::min<int>((int) (p1.y + s1.y), tm.pos.y + tm.size.x);
+      const int x0 = std::max<int>((int) p1.x, tm.pos.x) - tm.pos.x;
+      const int y0 = std::max<int>((int) p1.y, tm.pos.y) - tm.pos.y;
+      const int x1 = std::min<int>((int) (p1.x + s1.x), tm.pos.x + tm.size.x) - tm.pos.x;
+      const int y1 = std::min<int>((int) (p1.y + s1.y), tm.pos.y + tm.size.y) - tm.pos.y;
+
+      const int off_y = tm.pos.y < 0 ? -1 : 0; // why do I need this?
 
       for (int y = y0; y <= y1; y++)
       {
+        int y3 = y+off_y;
+        if (y3 < 0 || y3 >= tm.size.y) continue;
         for (int x = x0; x <= x1; x++)
         {
-          const auto & tile = tm[{x, y}];
+          if (x < 0 || x >= tm.size.x) continue;
+          const auto & tile = tm[{x, y3}];
           if (tile.is_nonempty())
             return true;
         }
@@ -131,11 +136,78 @@ bool hit_test (V2 <float> p1, V2 <float> s1)
   return false;
 }
 
+
 // ----
 
+// int current_screen = 0;
+// Player player
+//   (V2<float>{ 3, 16 }
+//   );
+
+int current_screen = 10;
 Player player
-  (V2<float>{ 3, 16 }
+  (V2<float>{ 122+10, -151 + 19 }
   );
+
+int get_current_screen ()
+{
+  int i = 0;
+  for (auto tm : tilemaps)
+  {
+    const V2 <float> p1 { player.pos.x + player.size.x/2, player.pos.y + player.size.y/2};
+    const V2 <float> p2 { (float) tm.pos.x,  (float) tm.pos.y  };
+    const V2 <float> s2 { (float) tm.size.x, (float) tm.size.y };
+    if (pt_in_rect (p1,p2,s2))
+      return i;
+    i++;
+  }
+  return -1;
+}
+
+void main_tick ()
+{
+  processInput(window);
+
+  if (global::ticks_to_skip)
+  {
+    global::ticks_to_skip--;
+    return;
+  }
+
+  player.tick ();
+  const int new_screen = get_current_screen ();
+
+  if (new_screen >= 0 && current_screen != new_screen)
+  {
+    current_screen = new_screen;
+    const auto tm = tilemaps[current_screen];
+    fmt::print("new screen: {}, {}, {}\n", current_screen, tm.pos.x, tm.pos.y);
+  }
+
+  {
+    const auto tm = tilemaps[current_screen];
+    const float w = 40.f;
+    const float h = w/window_width*window_height;
+
+    float x = player.pos.x - player.size.x/2 - w/2;
+    float y = player.pos.y - player.size.y/2 - h/2;
+
+    if (auto x2 = tm.pos.x + tm.size.x - w; x > x2) x = x2;
+    if (auto y2 = tm.pos.y + tm.size.y - h; y > y2) y = y2;
+    if (x < tm.pos.x) x = tm.pos.x;
+    if (y < tm.pos.y) y = tm.pos.y;
+
+    if (tm.size.y < h)
+    {
+      y += (tm.size.y - h)/2;
+    }
+
+    cam.x = -x;
+    cam.y = -y;
+  }
+
+  global::ticks_elapsed++;
+}
 
 // ----
 
@@ -253,9 +325,7 @@ int main ()
 
     while (!glfwWindowShouldClose(window))
     {
-      processInput(window);
-
-      player.tick ();
+      main_tick ();
 
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
@@ -275,7 +345,8 @@ int main ()
         shader.use ();
         glBindVertexArray(VAO);
 
-        for (auto & tm : tilemaps)
+        auto tm = tilemaps[current_screen];
+        /*for (auto & tm : tilemaps)*/
         {
           for (int y = 0; y < tm.size.y; y++)
           {
@@ -308,12 +379,19 @@ int main ()
         auto model_ = glm::translate(model, {player.pos.x, player.pos.y, 0.0});
         simple_shader.setMat4("model", model_);
         simple_shader.setVec2("size", player.size.x, player.size.y);
+
+        if (player.dash_state == Player::DirectionPending)
+          simple_shader.setVec3 ("color", 1.f, 1.f, 1.f);
+        else if (player.n_dashes == 0)
+          simple_shader.setVec3 ("color", 0.f, 0.f, 1.f);
+        else
+          simple_shader.setVec3 ("color", 1.f, 0.f, 0.f);
+
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
       }
 
       glfwSwapBuffers(window);
       glfwPollEvents();
-      global::ticks_elapsed++;
     }
 
     glDeleteVertexArrays(1, &VAO);
@@ -333,29 +411,28 @@ void processInput(GLFWwindow *window)
   if (glfwGetKey(window, 'Q') == GLFW_PRESS)
       glfwSetWindowShouldClose(window, true);
 
-  const float zoom_speed = 0.1;
-  cam.z += get_move <float> ('O', 'I') * zoom_speed;
+  // const float zoom_speed = 0.1;
+  // cam.z += get_move <float> ('O', 'I') * zoom_speed;
 
+  // V2 <float> move { 0.0, 0.0 };
+  // if (key_pressed (GLFW_KEY_LEFT )) move.x += 1.0;
+  // if (key_pressed (GLFW_KEY_RIGHT)) move.x -= 1.0;
+  // if (key_pressed (GLFW_KEY_UP )) move.y += 1.0;
+  // if (key_pressed (GLFW_KEY_DOWN)) move.y -= 1.0;
 
-  V2 <float> move { 0.0, 0.0 };
-  if (key_pressed (GLFW_KEY_LEFT )) move.x += 1.0;
-  if (key_pressed (GLFW_KEY_RIGHT)) move.x -= 1.0;
-  if (key_pressed (GLFW_KEY_UP )) move.y += 1.0;
-  if (key_pressed (GLFW_KEY_DOWN)) move.y -= 1.0;
+  // float speed = 0.3;
 
-  float speed = 0.3 *  0.02;
+  // if (cam.z > 0)
+  // {
+  //   speed *= 1.0 - cam.z/32.0;
+  // }
+  // else
+  // {
+  //   speed *= 1.0 + (-cam.z)/32.0;
+  // }
 
-  if (cam.z > 0)
-  {
-    speed *= 1.0 - cam.z/32.0;
-  }
-  else
-  {
-    speed *= 1.0 + (-cam.z)/32.0;
-  }
-
-  cam.x += move.x * speed;
-  cam.y += move.y * speed;
+  // cam.x += move.x * speed;
+  // cam.y += move.y * speed;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes

@@ -10,7 +10,7 @@ uniform vec2 size;
 
 void main()
 {
-	gl_Position = projection * view * model *
+  gl_Position = projection * view * model *
     vec4
     ( vec3
       ( (aPos.x) * size.x

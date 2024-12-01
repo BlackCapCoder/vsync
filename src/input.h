@@ -5,25 +5,6 @@
 #include <iostream>
 
 
-bool key_pressed (int key);
-
-template <class T>
-T get_move (char l, char r)
-{
-  T move = 0;
-  if (key_pressed (l)) move -= 1;
-  if (key_pressed (r)) move += 1;
-  return move;
-}
-
-template <class T>
-V2 <T> get_movement (char n, char e, char s, char w)
-{
-  return V2 <T>
-    { .x = get_move <T> (w, e)
-    , .y = get_move <T> (n, s)
-    };
-}
 
 constexpr char jump_key = 'J';
 
@@ -39,6 +20,7 @@ tick_t tick_t_never = 0;
 namespace global
 {
   static tick_t ticks_elapsed = 0;
+  static uint8_t ticks_to_skip = 0;
 }
 
 struct KeyMapEntry
@@ -86,5 +68,34 @@ struct KeyMap
 namespace global
 {
   static KeyMap keymap {};
+}
+
+
+/*bool key_pressed (int key);*/
+
+// if a key was pressed and released, but we didn't check
+// `key_pressed` still report the key as being pressed.
+//
+bool key_pressed_ (int key)
+{
+  return global::keymap.get (key) . state;
+}
+
+template <class T>
+T get_move (char l, char r)
+{
+  T move = 0;
+  if (key_pressed_ (l)) move -= 1;
+  if (key_pressed_ (r)) move += 1;
+  return move;
+}
+
+template <class T>
+V2 <T> get_movement (char n, char e, char s, char w)
+{
+  return V2 <T>
+    { .x = get_move <T> (w, e)
+    , .y = get_move <T> (n, s)
+    };
 }
 
