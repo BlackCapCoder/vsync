@@ -91,7 +91,7 @@ private:
   // ----
 
   // Before starting a dash we freeze the game for a few frames
-  // to give the player time to choose a dash-direction
+  // to give the player time to input a dash-direction
   static constexpr tick_t freeze_time = 5;
   V2 <int> dash_direction;
 
@@ -176,13 +176,6 @@ private:
   }
   void on_dashing ()
   {
-    // we could do this once in `begin_dash`, but doing it every frame
-    // allows wrapping around corners.
-    // {
-    //   vel.x = dash_vel.x;
-    //   vel.y = dash_vel.y;
-    // }
-
     if (global::ticks_elapsed > dash_timeout)
       end_dash ();
   }
@@ -263,29 +256,6 @@ private:
       return 1 + moveXY (dx, dy);
     }
     return 1;
-  }
-
-  float moveStep (float dx, float dy)
-  {
-    if (dx == 0) return foo (pos.y, size.y, dy);
-    if (dy == 0) return foo (pos.x, size.x, dx);
-
-    return std::min
-      ( foo (pos.x, size.x, dx)
-      , foo (pos.y, size.y, dy)
-      );
-  }
-  float foo (float a, float c, float b)
-  {
-    float q0;
-    if (b > 0)
-      q0 = (a+c) - std::floor(a+c);
-    else
-    {
-      q0 = a - std::floor (a);
-      q0 = q0 == 0 ? -1 : -q0;
-    }
-    return q0 / b;
   }
 
   // when hitting something, wait a few frames before killing the speed.
@@ -454,18 +424,11 @@ private:
     bool gnew = check_is_grounded ();
     if (gnew)
       on_grounded ();
-    if (is_grounded == gnew) return;
+    if (is_grounded == gnew)
+      return;
     is_grounded = gnew;
-
-    if (gnew)
-    {
-      // we do this more accurately in apply_velocity
-      // vel.y = 0;
-    }
-    else
-    {
+    if (!gnew)
       time_ungrounded = global::ticks_elapsed;
-    }
   }
 
   void on_grounded ()
@@ -487,7 +450,7 @@ private:
   {
     return is_grounded ? fric_ground : fric_air;
   }
-  /*const auto move = get_movement <float> ('E','F','D','S');*/
+  // const auto move = get_movement <float> ('E','F','D','S');
 
   void do_walking ()
   {
@@ -539,7 +502,7 @@ private:
   float get_gravity ()
   {
     float g = gravity_accel;
-    if (key_pressed_ (jump_key)) // half gravity while holding jump
+    if (key_pressed_ (jump_key)) // gravity discounts if holding jump
     {
       if (global::ticks_elapsed - time_last_jump <= zero_grav_time)
         g = 0;

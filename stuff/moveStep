@@ -1,0 +1,24 @@
+
+
+  float moveStep (float dx, float dy)
+  {
+    if (dx == 0) return foo (pos.y, size.y, dy);
+    if (dy == 0) return foo (pos.x, size.x, dx);
+
+    return std::min
+      ( foo (pos.x, size.x, dx)
+      , foo (pos.y, size.y, dy)
+      );
+  }
+  float foo (float a, float c, float b)
+  {
+    float q0;
+    if (b > 0)
+      q0 = (a+c) - std::floor(a+c);
+    else
+    {
+      q0 = a - std::floor (a);
+      q0 = q0 == 0 ? -1 : -q0;
+    }
+    return q0 / b;
+  }
