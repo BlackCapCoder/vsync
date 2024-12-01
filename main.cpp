@@ -15,6 +15,7 @@
 #include "src/tilemap.h"
 #include "src/player.h"
 #include "src/input.h"
+#include "src/room_stuff.h"
 
 // ----------
 
@@ -144,9 +145,14 @@ bool hit_test (V2 <float> p1, V2 <float> s1)
 //   (V2<float>{ 3, 16 }
 //   );
 
-int current_screen = 12;
+// int current_screen = 12;
+// Player player
+//   (V2<float>{ 82+10, -174 + 17 }
+//   );
+
+int current_screen = 6;
 Player player
-  (V2<float>{ 82+10, -174 + 17 }
+  (V2<float>{ 162+8, -151 + 16 }
   );
 
 int get_current_screen ()
@@ -413,6 +419,13 @@ void processInput(GLFWwindow *window)
       glfwSetWindowShouldClose(window, true);
   if (glfwGetKey(window, 'Q') == GLFW_PRESS)
       glfwSetWindowShouldClose(window, true);
+
+  if (glfwGetKey(window, 'P') == GLFW_PRESS)
+  {
+    const auto & tm = tilemaps[current_screen];
+    const auto p = player.pos - V2 <float> {(float) tm.pos.x, (float) tm.pos.y};
+    fmt::print("player pos: {}, {}\n", (int) p.x, (int) p.y);
+  }
 
   // const float zoom_speed = 0.1;
   // cam.z += get_move <float> ('O', 'I') * zoom_speed;

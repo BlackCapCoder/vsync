@@ -59,12 +59,17 @@ struct Player
 
     if (dash_state == NotDashing)
     {
-      do_walking ();
-      do_gravity ();
+      if (is_climbing)
+        climb_update ();
+      else if (! try_climb ())
+      {
+        do_movement ();
+        do_gravity ();
+      }
     }
 
     // just for debugging
-    if (key_pressed_('A'))
+    if (key_pressed_(' '))
       vel.y = -10;
 
     if (dash_state != DirectionPending)
@@ -450,10 +455,16 @@ private:
   {
     return is_grounded ? fric_ground : fric_air;
   }
-  // const auto move = get_movement <float> ('E','F','D','S');
 
-  void do_walking ()
+  // While this timer is on, the player cannot control their x-velocity,
+  // but also is not subject to friction. Used for forced movement.
+  tick_t no_move_timer{};
+
+  void do_movement ()
   {
+    if (global::ticks_elapsed <= no_move_timer)
+      return;
+
     const float mx = get_move <float> ('S', 'F');
     float vx = vel.x;
 
@@ -498,13 +509,15 @@ private:
   // we barely move off the ground, but we also want to be able to jump high!
   // Delay gravity for a few frames while jump is held.
   static constexpr int zero_grav_time = 15;
+  tick_t zero_grav_timeout{};
 
   float get_gravity ()
   {
     float g = gravity_accel;
     if (key_pressed_ (jump_key)) // gravity discounts if holding jump
     {
-      if (global::ticks_elapsed - time_last_jump <= zero_grav_time)
+      /*if (global::ticks_elapsed - time_last_jump <= zero_grav_time)*/
+      if (global::ticks_elapsed <= zero_grav_timeout)
         g = 0;
       else
         g *= 0.5;
@@ -546,15 +559,22 @@ private:
 
   bool do_jumping ()
   {
-    if (! has_key_buffered (jump_key)) return false;
-    const auto jt = global::keymap.get (jump_key).time;
-    if (jt <= time_last_jump)
+    if (! has_key_buffered (jump_key))
       return false;
+    if (global::keymap.get (jump_key).time <= time_last_jump)
+      return false;
+
+    if (is_climbing)
+    {
+      climb_jump ();
+      return true;
+    }
+
     if (! is_grounded)
     {
       if ( time_ungrounded + cayotee_time < global::ticks_elapsed
         || time_ungrounded <= time_last_jump // you only get 1 jump!
-         ) return try_wallbounce ();
+         ) return try_walljump ();
 
       std::cout << "cayotee jump" << std::endl;
     }
@@ -565,6 +585,7 @@ private:
     }
 
     time_last_jump = global::ticks_elapsed;
+    zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
     vel.y = -jump_liftoff;
 
     if (dash_state == Dashing)
@@ -607,39 +628,194 @@ private:
   }
 
   static constexpr float
-    wallbounce_wall_dist = 0.3f;
+    wallbounce_wall_dist = 0.35f;
   static constexpr float
     wallbounce_speed_y = 28.f;
   static constexpr float
     wallbounce_speed_x = 24.f;
 
-  bool try_wallbounce ()
+  static constexpr float
+    walljump_wall_dist = 0.2f;
+  static constexpr float
+    walljump_speed_x = 12.f;
+
+  int wall_check (float dist)
   {
-    if (vel.x != 0 || vel.y >= 0)
-      return false;
+    return hit_test ({pos.x - dist, pos.y}, {dist, size.y})
+         ? -1
+         : hit_test ({pos.x + size.x, pos.y}, {dist, size.y})
+         ? +1
+         : 0;
+  }
 
-    if (global::ticks_elapsed > dash_bounce_timeout)
-      return false;
+  bool try_walljump ()
+  {
+    if (vel.x != 0 || vel.y >= 0 || global::ticks_elapsed > dash_bounce_timeout)
 
-    const int wall_dir
-      = hit_test ({pos.x - wallbounce_wall_dist, pos.y}, {wallbounce_wall_dist, size.y})
-      ? -1
-      : hit_test ({pos.x + size.x, pos.y}, {wallbounce_wall_dist, size.y})
-      ? +1
-      : 0;
+    // wall jump
+    {
+      if (dash_state != NotDashing)
+        return false;
 
-    if (wall_dir == 0)
-      return false;
+      const int wall_dir = wall_check (walljump_wall_dist);
+      if (wall_dir == 0) return false;
 
-    dash_state = NotDashing;
-    dash_bounce_timeout = 0;
+      const int mx =
+        get_move <int> ('S', 'F');
+
+      vel.x = -walljump_speed_x * wall_dir;
+      vel.y = -jump_liftoff;
+
+      if (mx == 0)
+      {
+        // neutral jump
+        zero_grav_timeout = global::ticks_elapsed + 12;
+        no_move_timer = global::ticks_elapsed + 4;
+      }
+      else if (mx != wall_dir)
+      {
+        // kick away from the wall
+        zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
+        no_move_timer = global::ticks_elapsed + 8;
+        facing = -mx;
+      }
+      else
+      {
+        no_move_timer = global::ticks_elapsed + 18;
+      }
+
+    }
+    else
+
+    // wallbounce
+    {
+      const int wall_dir = wall_check (wallbounce_wall_dist);
+      if (wall_dir == 0) return false;
+
+      dash_state = NotDashing;
+      dash_bounce_timeout = 0;
+
+      zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
+
+      vel.x = -wallbounce_speed_x * wall_dir;
+      vel.y = -wallbounce_speed_y;
+    }
 
     time_last_jump = global::ticks_elapsed;
-    vel.x = -wallbounce_speed_x * wall_dir;
-    vel.y = -wallbounce_speed_y;
 
     return true;
   }
+
+  // ----
+
+  static constexpr float climb_attach_wall_dist = 0.3;
+  static constexpr float climb_speed = 10.0;
+  bool is_climbing = false;
+
+  bool try_climb ()
+  {
+    if (!key_pressed_ ('A'))
+      return false;
+
+    if (facing > 0)
+    {
+      if (! hit_test ({pos.x + size.x, pos.y}, {climb_attach_wall_dist, size.y}))
+        return false;
+    }
+    else
+    {
+      if (! hit_test ({pos.x - climb_attach_wall_dist, pos.y}, {climb_attach_wall_dist, size.y}))
+      {
+        return false;
+      }
+    }
+
+    moveX (climb_attach_wall_dist * facing);
+
+    vel.x = 0; vel.y = 0;
+    is_climbing = true;
+    dash_state = NotDashing;
+
+    return true;
+  }
+  void climb_update ()
+  {
+    {
+      is_climbing = false;
+
+      if (!key_pressed_ ('A'))
+        return;
+
+      if (facing > 0)
+      {
+        if (! hit_test ({pos.x + size.x, pos.y}, {climb_attach_wall_dist, size.y}))
+          return;
+      }
+      else
+      {
+        if (! hit_test ({pos.x - climb_attach_wall_dist, pos.y}, {climb_attach_wall_dist, size.y}))
+          return;
+      }
+
+      is_climbing = true;
+    }
+
+    const float my = get_move <int> ('E', 'D');
+    if (my == 0)
+    {
+      if (vel.y >= 0)
+        vel.y = 0;
+      else
+      {
+        const float g = get_gravity ();
+        vel.y = std::min<float>(0, vel.y + g);
+      }
+    }
+    else if (signum(vel.y) == my)
+    {
+      if (vel.y > 0 || vel.y * my < climb_speed)
+        vel.y = my * climb_speed;
+      else
+      {
+        const float g = get_gravity ();
+        vel.y = std::min<float>(-climb_speed, vel.y + g);
+      }
+    }
+    else
+    {
+      vel.y = my * climb_speed;
+    }
+  }
+
+  void climb_jump ()
+  {
+    const float mx = get_move <int> ('S', 'F');
+
+    vel.y -= jump_liftoff;
+    time_last_jump = global::ticks_elapsed;
+
+    if (mx != -facing)
+    {
+      zero_grav_timeout = global::ticks_elapsed + 10;
+    }
+    else
+    {
+      zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
+      vel.x = mx * walljump_speed_x;
+      is_climbing = false;
+      facing *= -1;
+    }
+  }
+
+public:
+
+  void die ()
+  {
+    // TODO: I have respawn points for each level over in `room_stuff.h`,
+    // but how to access those in a clean way..
+  }
+
+private:
 
 };
 

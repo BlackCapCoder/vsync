@@ -289,8 +289,9 @@ char * flavor (const TileMap & tm)
           };
 
         int b = 14;
-        for (const auto [ox, oy] : offs)
+        for (const auto & off : offs)
         {
+          const auto & [ox, oy] = off.vals;
           const int x2 = x+ox;
           const int y2 = y+oy;
           const int i2 = y2*tm.size.x+x2;
@@ -375,7 +376,7 @@ struct TileMapEx : TileMap
           tiles[i].tileset = 0;
           continue;
         }
-        auto [tx, ty] = q.value();
+        auto [tx, ty] = q.value().vals;
         const auto fl = flv[i];
 
         tiles[i].tileset = tm.tiles[i];

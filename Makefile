@@ -5,7 +5,6 @@ SRC_DIR = src
 BUILD_DIR = build
 TARGET = $(BUILD_DIR)/main
 
-EXCLUDE_FILES = $(SRC_DIR)/dummyfile.cpp
 SRCS = main.cpp $(SRC_DIR)/glad.c
 OBJS = $(BUILD_DIR)/glad.o $(BUILD_DIR)/main.o
 
