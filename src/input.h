@@ -3,24 +3,19 @@
 #include <GLFW/glfw3.h>
 #include "V2.h"
 #include <iostream>
-
-
-
-constexpr char jump_key = 'J';
+#include <map>
 
 // -----
 
-#include <map>
-
 using tick_t = size_t;
 
-constexpr
-tick_t tick_t_never = 0;
+constexpr tick_t
+  tick_t_never = 0;
 
 namespace global
 {
-  static tick_t ticks_elapsed = 0;
-  static uint8_t ticks_to_skip = 0;
+  static tick_t  ticks_elapsed = 0;
+  static uint8_t ticks_to_skip = 0; // set this to freeze time for N ticks in the main loop
 }
 
 struct KeyMapEntry
@@ -56,7 +51,6 @@ struct KeyMap
       oldE = newE;
     else
       return;
-    /*std::cout << time << std::endl;*/
   }
 
   KeyMapEntry & get (int key)
@@ -70,32 +64,59 @@ namespace global
   static KeyMap keymap {};
 }
 
+// ----
 
-/*bool key_pressed (int key);*/
-
-// if a key was pressed and released, but we didn't check
-// `key_pressed` still report the key as being pressed.
-//
-bool key_pressed_ (int key)
+struct Key
 {
-  return global::keymap.get (key) . state;
-}
+  const int val;
+  template <class T> constexpr Key (T a) : val {a} {};
 
-template <class T>
-T get_move (char l, char r)
-{
-  T move = 0;
-  if (key_pressed_ (l)) move -= 1;
-  if (key_pressed_ (r)) move += 1;
-  return move;
-}
+  const int operator () () const { return val; }
 
-template <class T>
-V2 <T> get_movement (char n, char e, char s, char w)
+  KeyMapEntry & entry () const
+  {
+    return global::keymap.get (val);
+  }
+
+  bool pressed () const
+  {
+    return entry () . state;
+  }
+
+  tick_t time () const
+  {
+    return entry () . time;
+  }
+
+  bool fresh (int expiration = 8) const
+  {
+    const auto & e = entry ();
+    return e.state && global::ticks_elapsed - e.time <= expiration;
+  }
+};
+
+namespace input
 {
-  return V2 <T>
-    { .x = get_move <T> (w, e)
-    , .y = get_move <T> (n, s)
-    };
-}
+  static constexpr Key
+    /*
+    */ move_N    = 'E'
+     , move_E    = 'F'
+     , move_S    = 'D'
+     , move_W    = 'S'
+     , jump      = 'J'
+     , dash      = 'K'
+     , dash_down = 'L'
+     , climb     = 'A'
+     , debug_key = ' '
+     ;
+
+  static int move_x ()
+  {
+    return move_E.pressed () - move_W.pressed ();
+  }
+  static int move_y ()
+  {
+    return move_S.pressed () - move_N.pressed ();
+  }
+};
 

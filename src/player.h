@@ -4,6 +4,7 @@
 #include "V2.h"
 #include <math.h>
 #include <iostream>
+#include <fmt/core.h>
 
 // ----
 
@@ -15,7 +16,6 @@ T signum (T a)
   return 0;
 }
 
-bool hit_test (V2 <float> pos);
 bool hit_test (V2 <float> pos, V2 <float> size);
 
 // ----
@@ -23,24 +23,24 @@ bool hit_test (V2 <float> pos, V2 <float> size);
 struct Player
 {
   V2 <float> pos;
-  V2 <float> vel{};
+  V2 <float> vel {};
+  int facing   = 1; // which direction the player facing. If we had a sprite we'd flip it when this is -1
+  int n_dashes = 1; // number of times the player can dash without getting a refill
+
+  // size of the players hitbox
   static constexpr V2 <float> size = { 7.9/8.0, 11.0/8.0 };
-  int facing = 1;
-  int n_dashes = 1;
 
   enum DashState
   { NotDashing
   , DirectionPending
   , Dashing
-  };
-
-  DashState dash_state = NotDashing;
+  }
+  dash_state = NotDashing;
 
   // -----
 
   Player (V2 <float> pos) : pos {pos}
   {
-    /*std::cout << fractionf (1.2) << std::endl;*/
   }
 
   void tick ()
@@ -48,7 +48,7 @@ struct Player
     do_grounding ();
 
     if (dash_state == NotDashing)
-      do_dash ();
+      try_dash ();
     else if (dash_state == DirectionPending)
       on_dash_dir_pending ();
 
@@ -69,7 +69,7 @@ struct Player
     }
 
     // just for debugging
-    if (key_pressed_(' '))
+    if (input::debug_key.pressed ())
       vel.y = -10;
 
     if (dash_state != DirectionPending)
@@ -78,54 +78,41 @@ struct Player
 
 private:
 
-  static constexpr tick_t input_buffer_frames =
-    8;
-    /*10;*/
-    /*50;*/
-
-  // like key_pressed, but the key will time-out after a few frames.
-  // Allows early inputs, but the key must still be pressed when we check!
-  //
-  bool has_key_buffered (int key)
-  {
-    const auto entry = global::keymap.get (key);
-    if (! entry.state) return false;
-    return global::ticks_elapsed - entry.time <= input_buffer_frames;
-  }
-
-  // ----
-
   // Before starting a dash we freeze the game for a few frames
   // to give the player time to input a dash-direction
   static constexpr tick_t freeze_time = 5;
   V2 <int> dash_direction;
 
-  static constexpr tick_t dash_duration = 120 * .15f;
-  static constexpr tick_t dash_cooldown = 120 * .2f; // time before we can dash again
+  static constexpr tick_t dash_duration     = 120 * .15f;
+  static constexpr tick_t dash_cooldown     = 120 * .2f; // time before we can dash again
   static constexpr tick_t dash_refresh_time = 120 * .1f; // time before we can get our dash back
-  static constexpr tick_t dash_bounce_time = 120 * .3f; // time to input a wallbounce after a dash
+  static constexpr tick_t dash_bounce_time  = 120 * .3f; // time to input a wallbounce after a dash
   tick_t dash_timeout;
   tick_t dash_cooldown_timeout;
   tick_t dash_refresh_timeout;
   tick_t dash_bounce_timeout;
 
-  static constexpr float dash_speed = 240.f / 8.f;
-  static constexpr float dash_up_mult = .75f;
+  static constexpr float dash_speed     = 240.f / 8.f;
   static constexpr float end_dash_speed = 160.f / 8.f;
+  static constexpr float dash_up_mult   = .75f;
 
   V2 <float> dash_vel;
+  tick_t time_dash_started {};
 
-  void do_dash ()
+
+  bool try_dash ()
   {
-    if ( n_dashes < 1
-      || !( has_key_buffered ('K')
-         || has_key_buffered ('L')
+    if ( dash_state != NotDashing
+      || n_dashes < 1
+      || global::ticks_elapsed < dash_cooldown_timeout
+      || !( input::dash.fresh ()
+         || input::dash_down.fresh ()
           )
-       ) return;
-    if (global::ticks_elapsed < dash_cooldown_timeout)
-      return;
+       )
+      return false;
 
     n_dashes--;
+    time_dash_started     = global::ticks_elapsed;
     dash_cooldown_timeout = global::ticks_elapsed + dash_cooldown;
     dash_refresh_timeout  = global::ticks_elapsed + dash_refresh_time;
 
@@ -133,17 +120,19 @@ private:
     dash_direction.x = 0;
     dash_direction.y = 0;
     global::ticks_to_skip = freeze_time;
+
+    return true;
   }
   void on_dash_dir_pending ()
   {
-    const float mx = get_move <int> ('S', 'F');
-    const float my = get_move <int> ('E', 'D');
+    const float mx = input::move_x ();
+    const float my = input::move_y ();
 
     if (mx != 0 && mx != dash_direction.x)
       dash_direction.x = mx;
     if (my != 0 && my != dash_direction.y)
       dash_direction.y = my;
-    if (key_pressed_('L'))
+    if (input::dash_down.pressed ())
       dash_direction.y = 1;
 
     if
@@ -151,6 +140,9 @@ private:
       (true)
       begin_dash ();
   }
+
+  bool pending_ultra = false;
+
   void begin_dash ()
   {
     dash_state = Dashing;
@@ -178,6 +170,9 @@ private:
 
     vel.x = dash_vel.x;
     vel.y = dash_vel.y;
+
+    pending_ultra =
+      dash_direction.y > 0 && dash_direction.x != 0;
   }
   void on_dashing ()
   {
@@ -327,7 +322,10 @@ private:
         else
         {
           moveY (vel.y * scale);
-          vel.y = 0;
+          const float old_vy = vel.y; vel.y = 0;
+
+          if (old_vy > 0 && !is_grounded)
+            early_grounding ();
         }
       }
       else ok = false;
@@ -400,21 +398,31 @@ private:
       && ! is_grounded
        )
     {
-      is_grounded = true;
-      on_grounded ();
-      if (do_jumping ())
-      {
-        apply_velocity ();
-        std::cout << "early jump" << std::endl;
-      }
+      early_grounding ();
     }
+  }
+  void early_grounding ()
+  {
+    is_grounded = true;
+    time_grounded = global::ticks_elapsed;
+    on_grounded ();
 
+    if (try_dash ())
+    {
+      std::cout << "early dash" << std::endl;
+    }
+    else if (do_jumping ())
+    {
+      apply_velocity ();
+      std::cout << "early jump" << std::endl;
+    }
   }
 
   // ----
 
   bool is_grounded = false;
   tick_t time_ungrounded = tick_t_never;
+  tick_t time_grounded   = tick_t_never;
 
   bool check_is_grounded ()
   {
@@ -426,13 +434,20 @@ private:
 
   void do_grounding ()
   {
-    bool gnew = check_is_grounded ();
+    const bool gnew =
+      check_is_grounded ();
+
     if (gnew)
       on_grounded ();
+
     if (is_grounded == gnew)
       return;
+
     is_grounded = gnew;
-    if (!gnew)
+
+    if (gnew)
+      time_grounded = global::ticks_elapsed;
+    else
       time_ungrounded = global::ticks_elapsed;
   }
 
@@ -444,12 +459,12 @@ private:
 
   // ----
 
-  static constexpr float walk_max = 90.f / 8;
-  static constexpr float walk_accel = 1;
-  static constexpr float walk_reduce = 400.f / (8 * 120);
+  static constexpr float walk_max      = 90.f / 8;
+  static constexpr float walk_accel    = 1;
+  static constexpr float walk_reduce   = 400.f / (8 * 120);
   static constexpr float walk_stopping = 0.03;
-  static constexpr float fric_ground = 1.0;
-  static constexpr float fric_air = 0.65;
+  static constexpr float fric_ground   = 1.0;
+  static constexpr float fric_air      = 0.65;
 
   float get_friction ()
   {
@@ -465,7 +480,7 @@ private:
     if (global::ticks_elapsed <= no_move_timer)
       return;
 
-    const float mx = get_move <float> ('S', 'F');
+    const float mx = input::move_x ();
     float vx = vel.x;
 
     const auto m_sign = signum (mx);
@@ -509,12 +524,12 @@ private:
   // we barely move off the ground, but we also want to be able to jump high!
   // Delay gravity for a few frames while jump is held.
   static constexpr int zero_grav_time = 15;
-  tick_t zero_grav_timeout{};
+  tick_t zero_grav_timeout {};
 
   float get_gravity ()
   {
     float g = gravity_accel;
-    if (key_pressed_ (jump_key)) // gravity discounts if holding jump
+    if (input::jump.pressed ()) // gravity discounts if holding jump
     {
       /*if (global::ticks_elapsed - time_last_jump <= zero_grav_time)*/
       if (global::ticks_elapsed <= zero_grav_timeout)
@@ -536,32 +551,27 @@ private:
 
 
   // grace period where you can still jump after having left the ground
-  static constexpr tick_t
-    cayotee_time =
-    // input_buffer_frames
-    5
-    ;
+  static constexpr
+  tick_t cayotee_time = 5;
 
   tick_t time_last_jump = 0;
 
-  static constexpr float
-    /*jump_liftoff = 15;*/
-    jump_liftoff = 13;
+  static constexpr
+  float jump_liftoff = 13;
 
   static constexpr float
-    super_speed = 260.f / 8;
-  static constexpr float
-    hyper_x_mult = 1.25;
-  static constexpr float
-    hyper_y_mult = 0.5;
-  static constexpr float
-    ultra_boost = 1.2;
+    /*
+    */ super_speed  = 260.f / 8
+     , hyper_x_mult = 1.25
+     , hyper_y_mult = 0.5
+     , ultra_boost  = 1.2
+     ;
 
   bool do_jumping ()
   {
-    if (! has_key_buffered (jump_key))
+    if (!input::jump.fresh ())
       return false;
-    if (global::keymap.get (jump_key).time <= time_last_jump)
+    if (input::jump.time () <= time_last_jump)
       return false;
 
     if (is_climbing)
@@ -570,18 +580,22 @@ private:
       return true;
     }
 
+    bool is_cayotee = false;
+    bool is_bunny   = false;
+
     if (! is_grounded)
     {
       if ( time_ungrounded + cayotee_time < global::ticks_elapsed
         || time_ungrounded <= time_last_jump // you only get 1 jump!
          ) return try_walljump ();
 
-      std::cout << "cayotee jump" << std::endl;
+      is_cayotee = true;
     }
     else
     {
       is_grounded = false;
       time_ungrounded = global::ticks_elapsed;
+      is_bunny = time_grounded == time_ungrounded;
     }
 
     time_last_jump = global::ticks_elapsed;
@@ -598,31 +612,88 @@ private:
       //vel.x = dash_vel.x;
       vel.x = super_speed * dash_direction.x;
 
+      if (n_dashes > 0)
+        fmt::print ("extended ");
+
       // allows reversing supers and hypers
       {
-        const int mx = get_move <int> ('S', 'F');
+        const float mx = input::move_x ();
         if (mx != 0 && mx != dash_direction.x)
         {
           vel.x *= -1;
-          std::cout << "reverse ";
+          fmt::print ("reverse ");
         }
       }
+
+      if (is_cayotee) fmt::print ("cayotee ");
+      if (is_bunny  ) fmt::print ("bunny ");
 
       if (dash_direction.y > 0)
       {
         vel.x *= hyper_x_mult;
         vel.y *= hyper_y_mult;
-        std::cout << "hyper" << std::endl;
+
+        // hypers and wave dashes are equivallent, but it is technically
+        // called a wave dash if you started mid-air.
+        if (time_dash_started < time_grounded)
+          fmt::print ("wave ");
+        else
+          fmt::print ("hyper ");
       }
       else
-      {
-        std::cout << "super" << std::endl;
-      }
+        fmt::print ("super ");
+
+      fmt::print ("dash\n");
     }
     else
     {
-      vel.x *= ultra_boost;
+      if (is_cayotee) fmt::print ("cayotee ");
+      if (is_bunny  ) fmt::print ("bunny ");
+
+      // We always apply the ultra boost, but don't
+      // bother logging it unless significant speed was gained.
+
+      bool nice_ultra = false;
+      if (pending_ultra)
+      {
+        nice_ultra = std::abs(vel.x) >= dash_speed;
+
+        vel.x *= ultra_boost;
+      }
+
+      // Unlike supers and hypers, which give constant speed, ultras
+      // are multiplicative and can be chained for infinite speed.
+      //
+      // You usually start a chain of ultras by performing an extended hyper (to obtain some speed),
+      // then immediately dash diagonally down. If the dash ends before you reach the ground and you
+      // jump, you'll get an ultra boost (vel.x *= 1.2).
+      // If the dash does not end before you jump you'll get a hyper instead, which sets your speed to a
+      // constant. Continue the chain of ultras by immediately dashing diagonally down after every jump.
+      //
+      // https://youtu.be/2XQJRG32dzI
+      //
+      // When ultras are performed on flat ground they are known as "gultras", and are only slightly
+      // faster hypers. To get the full infinite scaling from ultras you rely on terrain that looks like this:
+      //
+      // ####
+      //
+      //           ####
+      //
+      //                          ####
+      //
+      //                                                  ####
+      //
+      //                                                                             ####
+      //
+      //                                                                                                                      ####
+
+      if (nice_ultra)
+        fmt::print ("ultra\n");
+      else if (is_cayotee || is_bunny)
+        fmt::print ("jump\n");
     }
+
+    pending_ultra = false;
 
     return true;
   }
@@ -660,17 +731,23 @@ private:
       const int wall_dir = wall_check (walljump_wall_dist);
       if (wall_dir == 0) return false;
 
-      const int mx =
-        get_move <int> ('S', 'F');
+      const float mx = input::move_x ();
 
       vel.x = -walljump_speed_x * wall_dir;
       vel.y = -jump_liftoff;
 
       if (mx == 0)
       {
-        // neutral jump
         zero_grav_timeout = global::ticks_elapsed + 12;
         no_move_timer = global::ticks_elapsed + 4;
+
+        fmt::print ("neutral jump\n");
+
+        // Neutral jumps are performed by letting go of all directional input
+        // before a wall jump. Unlike regular walljumps, neutrals allow you
+        // to gain height; the climbing mechanic is entirely redundant.
+        //
+        // https://youtu.be/vfinx7aIL3o
       }
       else if (mx != wall_dir)
       {
@@ -699,6 +776,8 @@ private:
 
       vel.x = -wallbounce_speed_x * wall_dir;
       vel.y = -wallbounce_speed_y;
+
+      fmt::print ("wall bounce\n");
     }
 
     time_last_jump = global::ticks_elapsed;
@@ -714,7 +793,7 @@ private:
 
   bool try_climb ()
   {
-    if (!key_pressed_ ('A'))
+    if (!input::climb.pressed ())
       return false;
 
     if (facing > 0)
@@ -743,7 +822,7 @@ private:
     {
       is_climbing = false;
 
-      if (!key_pressed_ ('A'))
+      if (!input::climb.pressed ())
         return;
 
       if (facing > 0)
@@ -760,7 +839,7 @@ private:
       is_climbing = true;
     }
 
-    const float my = get_move <int> ('E', 'D');
+    const float my = input::move_y ();
     if (my == 0)
     {
       if (vel.y >= 0)
@@ -789,7 +868,7 @@ private:
 
   void climb_jump ()
   {
-    const float mx = get_move <int> ('S', 'F');
+    const float mx = input::move_x ();
 
     vel.y -= jump_liftoff;
     time_last_jump = global::ticks_elapsed;
