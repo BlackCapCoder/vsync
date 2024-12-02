@@ -15,8 +15,41 @@ constexpr tick_t
 namespace global
 {
   static tick_t  ticks_elapsed = 0;
-  static uint8_t ticks_to_skip = 0; // set this to freeze time for N ticks in the main loop
+  static uint8_t ticks_to_skip = 0;
+
+  // The actual freezing is performed in main
+  static void freeze_time (tick_t duration)
+  {
+    ticks_to_skip += duration;
+  }
 }
+
+template <tick_t framesT = 0>
+struct Timer
+{
+  static constexpr tick_t frames = framesT;
+  tick_t deadline;
+
+  void start (tick_t frames = framesT)
+  {
+    deadline = global::ticks_elapsed + frames;
+  }
+  void stop ()
+  {
+    deadline = tick_t_never;
+  }
+
+  bool alive ()
+  {
+    return global::ticks_elapsed <= deadline;
+  }
+  bool dead ()
+  {
+    return global::ticks_elapsed > deadline;
+  }
+};
+
+// ----
 
 struct KeyMapEntry
 {

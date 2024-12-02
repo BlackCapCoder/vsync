@@ -79,18 +79,19 @@ struct Player
 private:
 
   // Before starting a dash we freeze the game for a few frames
-  // to give the player time to input a dash-direction
-  static constexpr tick_t freeze_time = 5;
+  // to give the player time to input a direction to dash in.
+  //
+  // If we didn't do this you'd have to be careful to press
+  // all the buttons at the same time; diagonal dashes become
+  // inconsistent!
+  //
+  static constexpr tick_t freeze_frames = 5;
   V2 <int> dash_direction;
 
-  static constexpr tick_t dash_duration     = 120 * .15f;
-  static constexpr tick_t dash_cooldown     = 120 * .2f; // time before we can dash again
-  static constexpr tick_t dash_refresh_time = 120 * .1f; // time before we can get our dash back
-  static constexpr tick_t dash_bounce_time  = 120 * .3f; // time to input a wallbounce after a dash
-  tick_t dash_timeout;
-  tick_t dash_cooldown_timeout;
-  tick_t dash_refresh_timeout;
-  tick_t dash_bounce_timeout;
+  Timer <(tick_t) (120 * .15f)> dash_timer;
+  Timer <(tick_t) (120 * .2f )> dash_cooldown_timer;
+  Timer <(tick_t) (120 * .1f )> dash_refresh_timer;
+  Timer <(tick_t) (120 * .3f )> dash_bounce_timer;
 
   static constexpr float dash_speed     = 240.f / 8.f;
   static constexpr float end_dash_speed = 160.f / 8.f;
@@ -104,7 +105,7 @@ private:
   {
     if ( dash_state != NotDashing
       || n_dashes < 1
-      || global::ticks_elapsed < dash_cooldown_timeout
+      || dash_cooldown_timer.alive ()
       || !( input::dash.fresh ()
          || input::dash_down.fresh ()
           )
@@ -112,14 +113,15 @@ private:
       return false;
 
     n_dashes--;
-    time_dash_started     = global::ticks_elapsed;
-    dash_cooldown_timeout = global::ticks_elapsed + dash_cooldown;
-    dash_refresh_timeout  = global::ticks_elapsed + dash_refresh_time;
+    time_dash_started = global::ticks_elapsed;
+    dash_cooldown_timer.start ();
+    dash_refresh_timer.start ();
 
     dash_state = DirectionPending;
     dash_direction.x = 0;
     dash_direction.y = 0;
-    global::ticks_to_skip = freeze_time;
+
+    global::freeze_time (freeze_frames);
 
     return true;
   }
@@ -146,8 +148,8 @@ private:
   void begin_dash ()
   {
     dash_state = Dashing;
-    dash_timeout = global::ticks_elapsed + dash_duration;
-    dash_bounce_timeout = global::ticks_elapsed + dash_bounce_time;
+    dash_timer.start ();
+    dash_bounce_timer.start ();
 
     if (dash_direction.x == 0 && dash_direction.y == 0)
       dash_direction.x = facing;
@@ -176,8 +178,7 @@ private:
   }
   void on_dashing ()
   {
-    if (global::ticks_elapsed > dash_timeout)
-      end_dash ();
+    if (dash_timer.dead ()) end_dash ();
   }
   void end_dash ()
   {
@@ -266,8 +267,8 @@ private:
   int y_slide = 0;
 
   // if we have only x or y speed, try jiggling slightly on the other axis
-  static constexpr float corner_correction_slow = 0.2f;
-  static constexpr float corner_correction_fast = 0.45f;
+  static constexpr float corner_correction_slow     = 0.2f;
+  static constexpr float corner_correction_fast     = 0.45f;
   static constexpr float corner_correction_fast_vel = 22.f;
 
   void apply_velocity ()
@@ -389,9 +390,6 @@ private:
       }
     }
 
-    // not required and probably doesn't belong here,
-    // but if we're going to jump immediately at the beginning of the next frame,
-    // we might as well do it now so the user doesn't have to wait!
     if ( y_moved
       && y_more
       && vel.y > 0
@@ -401,6 +399,14 @@ private:
       early_grounding ();
     }
   }
+
+  // This is not required, but if we become grounded after `apply_velocity`,
+  // we attempt to dash/jump immediately, instead of at the beginning of
+  // the next frame.
+  //
+  // The user is already waiting for their inputs to be reflected on the screen,
+  // so why draw a useless frame they don't care about?
+  //
   void early_grounding ()
   {
     is_grounded = true;
@@ -453,7 +459,7 @@ private:
 
   void on_grounded ()
   {
-    if (global::ticks_elapsed >= dash_refresh_timeout)
+    if (dash_refresh_timer.dead ())
       n_dashes = 1;
   }
 
@@ -721,7 +727,7 @@ private:
 
   bool try_walljump ()
   {
-    if (vel.x != 0 || vel.y >= 0 || global::ticks_elapsed > dash_bounce_timeout)
+    if (vel.x != 0 || vel.y >= 0 || dash_bounce_timer.dead ())
 
     // wall jump
     {
@@ -770,7 +776,7 @@ private:
       if (wall_dir == 0) return false;
 
       dash_state = NotDashing;
-      dash_bounce_timeout = 0;
+      dash_bounce_timer.stop ();
 
       zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
 
