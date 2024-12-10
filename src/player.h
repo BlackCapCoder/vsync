@@ -848,7 +848,7 @@ private:
       // If the dash does not end before you jump you'll get a hyper instead, which sets your speed to a
       // constant. Continue the chain of ultras by immediately dashing diagonally down after every jump.
       //
-      // https://youtu.be/2XQJRG32dzI
+      // https://youtu.be/xk4rqdP46bU
       //
       // When ultras are performed on flat ground they are known as "gultras", and are only slightly
       // faster hypers. To get the full infinite scaling from ultras you rely on terrain that looks like this:
