@@ -31,7 +31,7 @@ TileMap new_tile_map (int w, int h)
 {
   tile_t * tiles = reinterpret_cast<tile_t *>(calloc (w*h, 1));
   return TileMap
-    { .size  = V2 <int> { .x = w, .y = h }
+    { .size  = V2 <int> {w, h}
     , .tiles = tiles
     };
 }
@@ -414,8 +414,8 @@ int pop_int (FILE * s)
 V2<int> pop_int2 (FILE * s)
 {
   return V2 <int>
-    { .x = pop_int (s)
-    , .y = pop_int (s)
+    { pop_int (s)
+    , pop_int (s)
     };
 }
 

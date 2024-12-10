@@ -2,6 +2,8 @@
 
 #include "input.h"
 #include "V2.h"
+#include "entity.h"
+#include <cmath>
 #include <math.h>
 #include <iostream>
 #include <fmt/core.h>
@@ -179,7 +181,36 @@ private:
   }
   void on_dashing ()
   {
-    if (dash_timer.dead ()) end_dash ();
+    if (dash_timer.dead ())
+      end_dash ();
+    else
+    {
+      const auto p
+        = pos
+        + V2 <float> {size.x/2, size.y/2}
+        ;
+
+      const float a
+        = std::atan2 (dash_direction.y, -dash_direction.x)
+        / (3.141592*2)
+        + 0.25
+        ;
+
+      for (int i = 0; i < 1; i++)
+      particles->spawn
+        ( p
+        , 0.8
+        , a
+        , 0.1
+        , 0.0
+        , 2.0
+        , 0.0
+        , 0.7f, 0.8f, 1.f
+        , 0.35
+        , 140
+        , 2.0
+        );
+    }
   }
   void end_dash ()
   {
@@ -420,9 +451,9 @@ private:
   //
   void early_grounding ()
   {
+    on_grounded ();
     is_grounded = true;
     time_grounded = global::ticks_elapsed;
-    on_grounded ();
 
     if (try_dash ())
     {
@@ -512,6 +543,30 @@ private:
   {
     if (dash_refresh_timer.dead ())
       n_dashes = 1;
+
+    if (! is_grounded && vel.y >= 0)
+    {
+      const auto p
+        = pos
+        + V2 <float> {size.x/2, size.y + 0.2}
+        ;
+
+      for (int i = 0; i < 12; i++)
+      particles->spawn
+        ( p
+        , V2 <float> { 0.5, 0.2 }
+        , 0.5
+        , 0.45
+        , 0.0
+        , 8.0
+        , 0.2
+        , 0.9, 0.9, 0.9
+        , 0.20
+        , 80
+        , 2.5
+        );
+
+    }
   }
 
   // ----
@@ -698,9 +753,38 @@ private:
           fmt::print ("wave ");
         else
           fmt::print ("hyper ");
+
       }
       else
         fmt::print ("super ");
+
+      {
+        const auto p
+          = pos
+          + V2 <float> {size.x/2, size.y * 0.9}
+          ;
+
+        const float a
+          = std::atan2 (0.20, -signum(vel.x))
+          / (3.141592*2)
+          + 0.25
+          ;
+
+        for (int i = 0; i < 18; i++)
+        particles->spawn
+          ( p
+          , 0.5
+          , a
+          , 0.15
+          , 15.0
+          , 30.0
+          , 0.15
+          , 0.6f, 0.7f, 1.f
+          , 0.25
+          , 60
+          , 10.0
+          );
+      }
 
       fmt::print ("dash\n");
     }

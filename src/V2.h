@@ -8,10 +8,14 @@ union V2
   struct { T w, h; };
   T vals [2];
 
-  constexpr V2 operator + (V2 that) { return V2 { x + that.x, y + that.y }; }
-  constexpr V2 operator - (V2 that) { return V2 { x - that.x, y - that.y }; }
-  constexpr V2 operator * (V2 that) { return V2 { x * that.x, y * that.y }; }
-  constexpr V2 operator / (V2 that) { return V2 { x / that.x, y / that.y }; }
+  constexpr V2 () : x{}, y{} {};
+  constexpr V2 (T x, T y) : x {x}, y {y} {}
+  constexpr V2 (T a) : x {a}, y {a} {}
+
+  constexpr V2 operator + (const V2 that) const { return V2 { x + that.x, y + that.y }; }
+  constexpr V2 operator - (const V2 that) const { return V2 { x - that.x, y - that.y }; }
+  constexpr V2 operator * (const V2 that) const { return V2 { x * that.x, y * that.y }; }
+  constexpr V2 operator / (const V2 that) const { return V2 { x / that.x, y / that.y }; }
 
   void operator += (V2 that) { x += that.x; y += that.y; }
   void operator -= (V2 that) { x -= that.x; y -= that.y; }

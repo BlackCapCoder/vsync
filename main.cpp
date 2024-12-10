@@ -27,11 +27,11 @@ unsigned int window_width  = 800;
 unsigned int window_height = 600;
 
 GLFWwindow * window;
-Shader shader, simple_shader;
+/*Shader shader, simple_shader;*/
 glm::vec3 cam { 0, 0, 0 };
 
 std::vector<TileMapEx> tilemaps;
-std::vector<Entity> entities;
+/*std::vector<Entity *> entities;*/
 
 // ----------
 
@@ -181,7 +181,7 @@ void main_tick ()
 
   for (auto e : entities)
   {
-    e.tick ();
+    e->tick ();
   }
 
   player.tick ();
@@ -250,7 +250,7 @@ int main ()
     return -1;
   }
 
-  glfwSetInputMode (window, GLFW_STICKY_KEYS, GLFW_TRUE);
+  /*glfwSetInputMode (window, GLFW_STICKY_KEYS, GLFW_TRUE);*/
   glfwSetKeyCallback (window, key_callback);
 
   glfwMakeContextCurrent(window);
@@ -264,6 +264,8 @@ int main ()
     fmt::print("Failed to initialize GLAD\n");
     return -1;
   }
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // build and compile our shader zprogram
   // ------------------------------------
@@ -348,11 +350,7 @@ int main ()
 
     // init entities
     {
-      entities.push_back
-        ( Entity
-            {
-            }
-        );
+      init_entities ();
     }
 
     glfwSetTime (0);
@@ -416,14 +414,6 @@ int main ()
         }
       }
 
-      // entities
-      {
-        for (auto e : entities)
-        {
-          e.render ();
-        }
-      }
-
       // player
       {
         simple_shader.use ();
@@ -434,13 +424,24 @@ int main ()
         simple_shader.setVec2("size", player.size.x, player.size.y);
 
         if (player.dash_state == Player::DirectionPending)
-          simple_shader.setVec3 ("color", 1.f, 1.f, 1.f);
+          simple_shader.setVec4 ("color", 1.f, 1.f, 1.f, 1.f);
         else if (player.n_dashes == 0)
-          simple_shader.setVec3 ("color", 0.4f, 0.4f, 1.f);
+          simple_shader.setVec4 ("color", 0.4f, 0.4f, 1.f, 1.f);
         else
-          simple_shader.setVec3 ("color", 1.f, 0.f, 0.f);
+          simple_shader.setVec4 ("color", 1.f, 0.f, 0.f, 1.f);
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+      }
+
+      // entities
+      {
+        // const auto & tm = tilemaps[current_screen];
+        // auto model_ = glm::translate (model, {tm.pos.x, tm.pos.y, 0});
+
+        for (auto e : entities)
+        {
+          e->render (model);
+        }
       }
 
       glfwSwapBuffers(window);
@@ -470,29 +471,6 @@ void processInput(GLFWwindow *window)
     const auto p = player.pos - V2 <float> {(float) tm.pos.x, (float) tm.pos.y};
     fmt::print("player pos: {}, {}\n", (int) p.x, (int) p.y);
   }
-
-  // const float zoom_speed = 0.1;
-  // cam.z += get_move <float> ('O', 'I') * zoom_speed;
-
-  // V2 <float> move { 0.0, 0.0 };
-  // if (key_pressed (GLFW_KEY_LEFT )) move.x += 1.0;
-  // if (key_pressed (GLFW_KEY_RIGHT)) move.x -= 1.0;
-  // if (key_pressed (GLFW_KEY_UP )) move.y += 1.0;
-  // if (key_pressed (GLFW_KEY_DOWN)) move.y -= 1.0;
-
-  // float speed = 0.3;
-
-  // if (cam.z > 0)
-  // {
-  //   speed *= 1.0 - cam.z/32.0;
-  // }
-  // else
-  // {
-  //   speed *= 1.0 + (-cam.z)/32.0;
-  // }
-
-  // cam.x += move.x * speed;
-  // cam.y += move.y * speed;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
