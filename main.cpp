@@ -193,6 +193,7 @@ void main_tick ()
     const auto tm = tilemaps[current_screen];
     fmt::print("new screen: {}, {}, {}\n", current_screen, tm.pos.x, tm.pos.y);
 
+    particles->ps = {};
     global::freeze_time (20); // sleep a bit after changing screens
     player.n_dashes = 1;
   }
@@ -266,6 +267,7 @@ int main ()
   }
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  /*glBlendFunc(GL_SRC_ALPHA, GL_DST_ALPHA);*/
 
   // build and compile our shader zprogram
   // ------------------------------------

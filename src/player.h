@@ -196,20 +196,52 @@ private:
         + 0.25
         ;
 
-      for (int i = 0; i < std::floor((float) 160 / global::ticks_per_sec()); i++)
-      particles->spawn
-        ( p
-        , 0.8
-        , a
-        , 0.1
-        , 0.0
-        , 2.0
-        , 0.0
-        , 0.7f, 0.8f, 1.f
-        , 0.35
-        , 140
-        , 2.0
-        );
+      if (global::ticks_elapsed % global::scaled_ticks(7) == 0)
+        particles->ps.push
+          ( Particle
+            { .pos = p
+            , .vel = 0
+            , .grav = 0
+            , .size = size
+            , .birth = global::ticks_elapsed
+            , .ttl = (int) global::scaled_ticks (12)
+            , .r=0.0f, .g=0.0f, .b=1.0f
+            , .fric = 1
+            , .animate_size = false
+            , .amul = 0.6
+            , .apow = 4.0
+            }
+          );
+
+      for (int i = 0; i < std::floor(2 * (float) 150 / global::ticks_per_sec()); i++)
+        particles->spawn
+          ( p
+          , 0.7
+          , a
+          , 0.05
+          , 0.0
+          , 1.0
+          , 0.0
+          , 1.f, 1.f, 1.f
+          , 0.08
+          , 220
+          , 2.0
+          );
+
+      for (int i = 0; i < std::floor((float) 150 / global::ticks_per_sec()); i++)
+        particles->spawn
+          ( p
+          , 0.75
+          , a
+          , 0.1
+          , 0.0
+          , 1.0
+          , 0.0
+          , 0.7f, 0.8f, 1.f
+          , 0.23
+          , 180
+          , 2.0
+          );
     }
   }
   void end_dash ()
@@ -548,22 +580,22 @@ private:
     {
       const auto p
         = pos
-        + V2 <float> {size.x/2, size.y + 0.2}
+        + V2 <float> {size.x/2, size.y + 0.0}
         ;
 
-      for (int i = 0; i < 12; i++)
+      for (int i = 0; i < 6; i++)
       particles->spawn
         ( p
-        , V2 <float> { 0.5, 0.2 }
+        , V2 <float> { 0.3, 0.0 }
         , 0.5
-        , 0.45
-        , 0.0
-        , 8.0
-        , 0.2
-        , 0.9, 0.9, 0.9
+        , 0.5
+        , 4.0
+        , 5.0
         , 0.20
-        , 80
-        , 2.5
+        , 0.8, 0.8, 0.8
+        , 0.15
+        , 120
+        , 12.0
         );
 
     }
@@ -768,24 +800,24 @@ private:
           ;
 
         const float a
-          = std::atan2 (0.20, -signum(vel.x))
+          = std::atan2 (0.2, -signum(vel.x))
           / (3.141592*2)
           + 0.25
           ;
 
-        for (int i = 0; i < 18; i++)
+        for (int i = 0; i < 8; i++)
         particles->spawn
           ( p
           , 0.5
           , a
-          , 0.15
+          , 0.10
+          , 20.0
           , 15.0
-          , 30.0
-          , 0.15
-          , 0.6f, 0.7f, 1.f
           , 0.25
+          , 0.8f, 0.9f, 1.f
+          , 0.15
           , 60
-          , 10.0
+          , 7.0
           );
       }
 
@@ -849,7 +881,7 @@ private:
   static constexpr float
     wallbounce_speed_y = 24.f;
   static constexpr float
-    wallbounce_speed_x = 20.f;
+    wallbounce_speed_x = 24.f;
 
   static constexpr float
     walljump_wall_dist = 0.2f;
@@ -919,7 +951,7 @@ private:
       dash_bounce_timer.stop ();
 
       zero_grav_timer.start(zero_grav_time);
-      no_move_timer.start(4);
+      no_move_timer.start(3);
 
       vel.x = -wallbounce_speed_x * wall_dir;
       vel.y = -wallbounce_speed_y;

@@ -33,13 +33,16 @@ static std::vector<Entity *> entities;
 struct Particle
 {
   V2 <float> pos {}, vel {}, grav {};
-  float size = 0.1;
+  V2 <float> size = 0.1;
   tick_t birth;
   int ttl = 10;
   float alpha = 1.0;
-  float start_size = 0.2;
+  V2 <float> start_size = 0.2;
   float r,g,b = 1.0;
   float fric = 3.5;
+  bool animate_size = true;
+  float amul = 1.0;
+  float apow = 5.0;
 
   bool tick ()
   {
@@ -52,8 +55,10 @@ struct Particle
     pos += vel * global::dt;
     vel += grav * 100 * global::dt;
     vel -= vel * fric * global::dt;
-    alpha = 1.0 - std::pow(a, 4.0);
-    size  = start_size * (1.0 - std::pow(a, 5.0) * 1.0);
+
+    alpha = (1.0 - std::pow(a, apow)) * amul;
+    if (animate_size)
+      size  = start_size * (1.0 - std::pow(a, 3.5));
 
     return true;
   }
@@ -102,9 +107,9 @@ struct Particles : Entity
       const auto p = ps.top ();
       ps.pop ();
       {
-        const auto model_ = glm::translate(model, {p.pos.x - p.size/2, p.pos.y - p.size/2, 0.0});
+        const auto model_ = glm::translate(model, {p.pos.x - p.size.w/2, p.pos.y - p.size.h/2, 0.0});
         simple_shader.setMat4("model", model_);
-        simple_shader.setVec2("size", p.size, p.size);
+        simple_shader.setVec2("size", p.size.w, p.size.h);
         simple_shader.setVec4 ("color", p.r, p.g, p.b, p.alpha);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
       }
