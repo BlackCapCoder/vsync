@@ -54,7 +54,7 @@ namespace global
 
   static tick_t scaled_ticks (tick_t t)
   {
-    return std::ceil (((secs) t) * global::tick_mult () - 0.25);
+    return std::round (((secs) t) * global::tick_mult ());
   }
 
 

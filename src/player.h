@@ -89,14 +89,14 @@ private:
   static constexpr tick_t freeze_frames = 5;
   V2 <int> dash_direction;
 
-  Timer <(tick_t) (120 * .15f)> dash_timer;
+  Timer <(tick_t) (120 * .16f)> dash_timer;
   Timer <(tick_t) (120 * .2f )> dash_cooldown_timer;
   Timer <(tick_t) (120 * .1f )> dash_refresh_timer;
   Timer <(tick_t) (120 * .3f )> dash_bounce_timer;
 
   static constexpr float dash_speed     = 240.f / 8.f;
   static constexpr float end_dash_speed = 160.f / 8.f;
-  static constexpr float dash_up_mult   = .75f;
+  static constexpr float dash_up_mult   = .7f;
 
   V2 <float> dash_vel;
   tick_t time_dash_started {}; // only used for debug output
@@ -196,7 +196,7 @@ private:
         + 0.25
         ;
 
-      for (int i = 0; i < 1; i++)
+      for (int i = 0; i < std::floor((float) 160 / global::ticks_per_sec()); i++)
       particles->spawn
         ( p
         , 0.8
@@ -294,7 +294,7 @@ private:
   // when hitting something, wait a few frames before killing the speed.
   // if we have both x and y velocity we can sort of slide around corners
   // and keep our speed
-  static constexpr int slide_grace = 8;
+  static constexpr int slide_grace = 6;
   int x_slide = 0;
   int y_slide = 0;
 
@@ -309,7 +309,7 @@ private:
       return;
 
     // const float scale = 0.01;
-    const float scale = 0.01 * global::intended_ticks_per_sec * global::dt;
+    const float scale = 0.009 * global::intended_ticks_per_sec * global::dt;
     // const float scale = global::dt / (5.f / 6.f);
     //const float scale = global::dt / (2.f / 3.f);
     const V2 <float> new_pos
@@ -599,7 +599,10 @@ private:
     const auto m_sign = signum (mx);
     const auto v_sign = signum (vx);
 
-    const auto mult = global::intended_ticks_per_sec * global::dt;
+    const auto mult
+      = global::intended_ticks_per_sec
+      * global::dt
+      * 1.0;
 
     if (mx != 0)
       facing = mx;
@@ -844,9 +847,9 @@ private:
   static constexpr float
     wallbounce_wall_dist = 0.35f;
   static constexpr float
-    wallbounce_speed_y = 28.f;
+    wallbounce_speed_y = 24.f;
   static constexpr float
-    wallbounce_speed_x = 24.f;
+    wallbounce_speed_x = 20.f;
 
   static constexpr float
     walljump_wall_dist = 0.2f;
@@ -916,6 +919,7 @@ private:
       dash_bounce_timer.stop ();
 
       zero_grav_timer.start(zero_grav_time);
+      no_move_timer.start(4);
 
       vel.x = -wallbounce_speed_x * wall_dir;
       vel.y = -wallbounce_speed_y;
