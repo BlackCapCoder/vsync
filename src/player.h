@@ -77,7 +77,6 @@ struct Player
   }
 
 private:
-
   // Before starting a dash we freeze the game for a few frames
   // to give the player time to input a direction to dash in.
   //
@@ -98,7 +97,7 @@ private:
   static constexpr float dash_up_mult   = .75f;
 
   V2 <float> dash_vel;
-  tick_t time_dash_started {};
+  tick_t time_dash_started {}; // only used for debug output
 
 
   bool try_dash ()
@@ -121,7 +120,8 @@ private:
     dash_direction.x = 0;
     dash_direction.y = 0;
 
-    global::freeze_time (freeze_frames);
+    // global::freeze_time (freeze_frames);
+    global::freeze_time_seconds (global::intended_tick_time * freeze_frames);
 
     return true;
   }
@@ -276,7 +276,10 @@ private:
     if (vel.x == 0 && vel.y == 0)
       return;
 
-    const float scale = 0.01;
+    // const float scale = 0.01;
+    const float scale = 0.01 * global::intended_ticks_per_sec * global::dt;
+    // const float scale = global::dt / (5.f / 6.f);
+    //const float scale = global::dt / (2.f / 3.f);
     const V2 <float> new_pos
       { pos.x + vel.x * scale
       , pos.y + vel.y * scale
@@ -298,13 +301,14 @@ private:
           ;
 
         if (const V2 <float> p {new_pos.x, new_pos.y - c}; !hit_test (p, size))
-          { pos = p; moveY(+c); } else
+          { pos = p; moveY(+c); if (!is_grounded) early_grounding (); } else
         if (const V2 <float> p {new_pos.x, new_pos.y + c}; !hit_test (p, size))
           { pos = p; moveY(-c); }
         else
         {
           moveX (vel.x * scale);
-          vel.x = 0;
+          if (! try_corner_boost ())
+            vel.x = 0;
         }
       }
       else if (vel.x == 0)
@@ -367,9 +371,11 @@ private:
     // TODO: refund lost mileage upon getting unstuck?
     //
     {
+      const int grace = std::round (((secs) slide_grace) * global::tick_mult ());
+
       if (x_moved)
         x_slide = 0;
-      else if (y_moved && x_slide < slide_grace)
+      else if (y_moved && x_slide < grace)
         x_slide++;
       else
       {
@@ -380,7 +386,7 @@ private:
 
       if (y_moved)
         y_slide = 0;
-      else if (x_moved && y_slide < slide_grace)
+      else if (x_moved && y_slide < grace)
         y_slide++;
       else
       {
@@ -407,6 +413,10 @@ private:
   // The user is already waiting for their inputs to be reflected on the screen,
   // so why draw a useless frame they don't care about?
   //
+  // If the relevant input is buffered and the buffer would have expired on the
+  // next frame, this function trigger behaviour that wouldn't have been triggered
+  // on the next frame, however, it is probably what the user intended.
+  //
   void early_grounding ()
   {
     is_grounded = true;
@@ -416,6 +426,17 @@ private:
     if (try_dash ())
     {
       std::cout << "early dash" << std::endl;
+
+      // Crucially we do NOT attempt to jump here because we are
+      // waiting for a game freeze, which is handeled downstream.
+      // 
+      // It could make sense to do an immediate super/hyper here when
+      // we already have movement input- skipping the freeze entirely,
+      // however this function is not called consistently!
+      //
+      // It would put us in a situation where we have a desirable
+      // behaviour that saves a significant number of frames, but
+      // it cannot be triggered consistently, even on identical inputs.
     }
     else if (do_jumping ())
     {
@@ -424,15 +445,38 @@ private:
     }
   }
 
+  bool try_corner_boost ()
+  {
+    return false; // TODO:
+
+    if (! input::jump.fresh () )
+      return false;
+    if (! input::climb.pressed () )
+      return false;
+
+    fmt::print ("corner boost\n");
+
+    dash_state = NotDashing;
+    /*is_climbing = true;*/
+    climb_jump ();
+
+    return true;
+  }
+
   // ----
 
   bool is_grounded = false;
+  Timer <5> cayotee_timer;
   tick_t time_ungrounded = tick_t_never;
   tick_t time_grounded   = tick_t_never;
 
   bool check_is_grounded ()
   {
-    const float feet_box_h = 0.20;
+    const float feet_box_h
+      = dash_state == NotDashing
+      ? 0.15 // for the purpose of landing
+      : 0.40 // for the purpose of refreshing dashes and things like air-supers
+      ;
     const V2 <float> fpos  { pos.x, pos.y + size.y };
     const V2 <float> fsize { size.x, feet_box_h };
     return hit_test(fpos, fsize);
@@ -452,9 +496,15 @@ private:
     is_grounded = gnew;
 
     if (gnew)
+    {
+      cayotee_timer.stop();
       time_grounded = global::ticks_elapsed;
+    }
     else
+    {
+      cayotee_timer.start();
       time_ungrounded = global::ticks_elapsed;
+    }
   }
 
   void on_grounded ()
@@ -479,11 +529,12 @@ private:
 
   // While this timer is on, the player cannot control their x-velocity,
   // but also is not subject to friction. Used for forced movement.
-  tick_t no_move_timer{};
+  // tick_t no_move_timer{};
+  Sec_Timer <> no_move_timer;
 
   void do_movement ()
   {
-    if (global::ticks_elapsed <= no_move_timer)
+    if (no_move_timer.alive ())
       return;
 
     const float mx = input::move_x ();
@@ -492,29 +543,31 @@ private:
     const auto m_sign = signum (mx);
     const auto v_sign = signum (vx);
 
+    const auto mult = global::intended_ticks_per_sec * global::dt;
+
     if (mx != 0)
       facing = mx;
 
     if (mx == 0)
     {
       const auto fric = get_friction ();
-      const auto vx2  = vx - v_sign * fric;
+      const auto vx2  = vx - v_sign * fric * mult;
       vx = signum (vx2) == v_sign ? vx2 : 0;
       vx *= 1 - walk_stopping;
     }
     else if (v_sign != m_sign)
     {
-      vx = m_sign * walk_accel;
+      vx = m_sign * walk_accel * mult;
     }
     else if (vx*v_sign < walk_max)
     {
-      const auto vx2 = vx + walk_accel*v_sign;
+      const auto vx2 = vx + walk_accel*v_sign * mult;
       vx = vx2*v_sign > walk_max ? walk_max*v_sign : vx2;
     }
     else
     {
       const auto fric = get_friction ();
-      const auto vx2  = vx - v_sign * fric * walk_reduce;
+      const auto vx2  = vx - v_sign * fric * walk_reduce * mult;
       vx = vx2*v_sign < walk_max ? walk_max*v_sign : vx2;
     }
 
@@ -530,19 +583,19 @@ private:
   // we barely move off the ground, but we also want to be able to jump high!
   // Delay gravity for a few frames while jump is held.
   static constexpr int zero_grav_time = 15;
-  tick_t zero_grav_timeout {};
+  Sec_Timer <> zero_grav_timer;
 
   float get_gravity ()
   {
     float g = gravity_accel;
     if (input::jump.pressed ()) // gravity discounts if holding jump
     {
-      /*if (global::ticks_elapsed - time_last_jump <= zero_grav_time)*/
-      if (global::ticks_elapsed <= zero_grav_timeout)
+      if (zero_grav_timer.alive ())
         g = 0;
       else
         g *= 0.5;
     }
+    g *= global::intended_ticks_per_sec * global::dt;
     return g;
   }
 
@@ -556,9 +609,6 @@ private:
   }
 
 
-  // grace period where you can still jump after having left the ground
-  static constexpr
-  tick_t cayotee_time = 5;
 
   tick_t time_last_jump = 0;
 
@@ -591,7 +641,8 @@ private:
 
     if (! is_grounded)
     {
-      if ( time_ungrounded + cayotee_time < global::ticks_elapsed
+      /*if ( time_ungrounded + cayotee_time < global::ticks_elapsed*/
+      if ( cayotee_timer.dead ()
         || time_ungrounded <= time_last_jump // you only get 1 jump!
          ) return try_walljump ();
 
@@ -600,12 +651,13 @@ private:
     else
     {
       is_grounded = false;
+      cayotee_timer.stop ();
       time_ungrounded = global::ticks_elapsed;
       is_bunny = time_grounded == time_ungrounded;
     }
 
     time_last_jump = global::ticks_elapsed;
-    zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
+    zero_grav_timer.start (zero_grav_time);
     vel.y = -jump_liftoff;
 
     if (dash_state == Dashing)
@@ -744,8 +796,8 @@ private:
 
       if (mx == 0)
       {
-        zero_grav_timeout = global::ticks_elapsed + 12;
-        no_move_timer = global::ticks_elapsed + 4;
+        zero_grav_timer.start(12);
+        no_move_timer.start (4);
 
         fmt::print ("neutral jump\n");
 
@@ -758,13 +810,13 @@ private:
       else if (mx != wall_dir)
       {
         // kick away from the wall
-        zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
-        no_move_timer = global::ticks_elapsed + 8;
+        zero_grav_timer.start(zero_grav_time);
+        no_move_timer.start (8);
         facing = -mx;
       }
       else
       {
-        no_move_timer = global::ticks_elapsed + 18;
+        no_move_timer.start (18);
       }
 
     }
@@ -778,7 +830,7 @@ private:
       dash_state = NotDashing;
       dash_bounce_timer.stop ();
 
-      zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
+      zero_grav_timer.start(zero_grav_time);
 
       vel.x = -wallbounce_speed_x * wall_dir;
       vel.y = -wallbounce_speed_y;
@@ -793,7 +845,7 @@ private:
 
   // ----
 
-  static constexpr float climb_attach_wall_dist = 0.3;
+  static constexpr float climb_attach_wall_dist = 0.1;
   static constexpr float climb_speed = 10.0;
   bool is_climbing = false;
 
@@ -881,11 +933,11 @@ private:
 
     if (mx != -facing)
     {
-      zero_grav_timeout = global::ticks_elapsed + 10;
+      zero_grav_timer.start(10);
     }
     else
     {
-      zero_grav_timeout = global::ticks_elapsed + zero_grav_time;
+      zero_grav_timer.start(zero_grav_time);
       vel.x = mx * walljump_speed_x;
       is_climbing = false;
       facing *= -1;

@@ -16,6 +16,7 @@
 #include "src/player.h"
 #include "src/input.h"
 #include "src/room_stuff.h"
+#include "src/entity.h"
 
 // ----------
 
@@ -30,6 +31,7 @@ Shader shader, simple_shader;
 glm::vec3 cam { 0, 0, 0 };
 
 std::vector<TileMapEx> tilemaps;
+std::vector<Entity> entities;
 
 // ----------
 
@@ -174,10 +176,12 @@ void main_tick ()
 {
   processInput(window);
 
-  if (global::ticks_to_skip)
-  {
-    global::ticks_to_skip--;
+  if (global::is_frozen)
     return;
+
+  for (auto e : entities)
+  {
+    e.tick ();
   }
 
   player.tick ();
@@ -215,7 +219,7 @@ void main_tick ()
     cam.y = -y;
   }
 
-  global::ticks_elapsed++;
+  // global::ticks_elapsed++;
 }
 
 // ----
@@ -342,8 +346,30 @@ int main ()
 
     // -------------------------
 
+    // init entities
+    {
+      entities.push_back
+        ( Entity
+            {
+            }
+        );
+    }
+
+    glfwSetTime (0);
+
+    // main loop
+    //
     while (!glfwWindowShouldClose(window))
     {
+      global::tick_time (glfwGetTime ());
+
+      {
+        if (global::ticks_elapsed % 120 == 0)
+        {
+          fmt::print("tick_time: {}\n", 1.f / global::tick_time());
+        }
+      }
+
       main_tick ();
 
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -387,7 +413,14 @@ int main ()
             }
           }
         }
+      }
 
+      // entities
+      {
+        for (auto e : entities)
+        {
+          e.render ();
+        }
       }
 
       // player
