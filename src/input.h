@@ -52,6 +52,11 @@ namespace global
     return t * s * (actual / intended_ticks_per_sec);
   }
 
+  static tick_t scaled_ticks (tick_t t)
+  {
+    return std::ceil (((secs) t) * global::tick_mult () - 0.25);
+  }
+
 
   static int is_frozen = false;
 
@@ -62,6 +67,7 @@ namespace global
   static void freeze_time (tick_t duration)
   {
     is_frozen = 1;
+    start_of_freeze_time = time;
     ticks_to_skip += duration;
   }
   static void freeze_time_seconds (double duration)
@@ -114,7 +120,7 @@ struct Timer
   }
   void start (tick_t frames = framesT)
   {
-    const tick_t t = std::ceil (((secs) frames) * global::tick_mult () - 0.25);
+    const tick_t t = global::scaled_ticks (frames);
     // fmt::print("time given: {}\n", t);
     start_exact (t);
   }
@@ -240,7 +246,7 @@ struct Key
 
   bool fresh (int expiration = 8) const
   {
-    expiration = std::ceil (((secs) expiration) * global::tick_mult () - 0.25);
+    expiration = global::scaled_ticks (expiration);
 
     const auto & e = entry ();
     return e.state && global::ticks_elapsed - e.time <= expiration;

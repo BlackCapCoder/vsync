@@ -193,7 +193,7 @@ void main_tick ()
     const auto tm = tilemaps[current_screen];
     fmt::print("new screen: {}, {}, {}\n", current_screen, tm.pos.x, tm.pos.y);
 
-    global::ticks_to_skip = 20; // sleep a bit after changing screens
+    global::freeze_time (20); // sleep a bit after changing screens
     player.n_dashes = 1;
   }
 
@@ -363,6 +363,7 @@ int main ()
     {
       global::tick_time (glfwGetTime ());
 
+      if (0)
       {
         if (global::ticks_elapsed % 120 == 0)
         {

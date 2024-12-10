@@ -121,7 +121,8 @@ private:
     dash_direction.y = 0;
 
     // global::freeze_time (freeze_frames);
-    global::freeze_time_seconds (global::intended_tick_time * freeze_frames);
+    // global::freeze_time_seconds (global::intended_tick_time * freeze_frames);
+    global::freeze_time (global::scaled_ticks (freeze_frames));
 
     return true;
   }
