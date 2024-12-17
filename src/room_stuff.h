@@ -2,6 +2,8 @@
 
 #include "V2.h"
 #include <vector>
+#include "tilemap.h"
+#include <fmt/core.h>
 
 // ----
 
@@ -37,4 +39,77 @@ std::vector <RoomMeta> make_room_metas ()
 
   return vec;
 }
+
+// ----
+
+struct Room
+{
+  virtual V2 <int> get_pos  () { return {0, 0}; }
+  virtual V2 <int> get_size () { return {0, 0}; }
+  virtual TileInfo get_tile (V2 <int> pt)
+  {
+    return TileInfo {};
+  }
+};
+
+struct TileMapRoom : Room
+{
+  V2 <int> pos, size;
+  TileInfo * tiles;
+  TileMapRoom (TileMapEx tmx)
+    : pos { tmx.pos }
+    , size { tmx.size }
+    , tiles { tmx.tiles }
+  {}
+
+  TileInfo get_tile (V2 <int> pt) override
+  {
+    return tiles[pt.x + pt.y * size.w];
+  }
+
+  V2 <int> get_pos  () override { return pos; }
+  V2 <int> get_size () override { return size; }
+};
+
+struct BigRoom : Room
+{
+  V2 <int> pos {100,100}, size;
+  std::vector <Room *> rooms;
+
+  V2 <int> get_pos  () override { return pos; }
+  V2 <int> get_size () override { return size; }
+
+  TileInfo get_tile (V2 <int> pt) override
+  {
+    for (auto * r : rooms)
+    {
+      const auto p = r->get_pos ();
+      const auto s = r->get_size ();
+      if (pt.x < p.x || pt.y < p.y) continue;
+      if (p.x + s.w <= pt.x || p.y + s.h <= pt.y) continue;
+      return r->get_tile (V2 <int> {pt.x - p.x, pt.y - p.y});
+    }
+    return TileInfo {};
+  }
+  TileInfo get_tile_local (V2 <int> pt)
+  {
+    return get_tile (pt + pos);
+  }
+  
+  void push (Room * r)
+  {
+    const int x1 = r->get_pos().x;
+    const int y1 = r->get_pos().y;
+    const int x2 = x1 + r->get_size().w;
+    const int y2 = y1 + r->get_size().h;
+    size.w = std::max(size.w + pos.x, x2);
+    size.h = std::max(size.h + pos.y, y2);
+    pos.x = std::min(pos.x, x1);
+    pos.y = std::min(pos.y, y1);
+    size.w -= pos.x;
+    size.h -= pos.y;
+    rooms.push_back (r);
+  }
+};
+
 

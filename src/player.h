@@ -178,6 +178,8 @@ private:
 
     pending_ultra =
       dash_direction.y > 0 && dash_direction.x != 0;
+
+    no_fric_timer.start (120 * .215f);
   }
   void on_dashing ()
   {
@@ -619,6 +621,7 @@ private:
   // but also is not subject to friction. Used for forced movement.
   // tick_t no_move_timer{};
   Sec_Timer <> no_move_timer;
+  Timer <> no_fric_timer;
 
   void do_movement ()
   {
@@ -657,7 +660,9 @@ private:
     }
     else
     {
-      const auto fric = get_friction ();
+      if (no_fric_timer.alive ()) return;
+      /*fmt::print("friction\n");*/
+      auto fric = get_friction ();
       const auto vx2  = vx - v_sign * fric * walk_reduce * mult;
       vx = vx2*v_sign < walk_max ? walk_max*v_sign : vx2;
     }
@@ -866,7 +871,9 @@ private:
       //                                                                                                                      ####
 
       if (nice_ultra)
-        fmt::print ("ultra\n");
+      {
+        fmt::print ("ultra: {}\n", vel.x);
+      }
       else if (is_cayotee || is_bunny)
         fmt::print ("jump\n");
     }

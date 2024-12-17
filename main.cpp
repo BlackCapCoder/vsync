@@ -286,8 +286,10 @@ int main ()
   // and hopefully they won't change at runtime.
   //
   tilemaps = load_tilemaps ("lvl");
+  tilemaps.push_back(boring_screen ({100, 100}, {700, 140}));
   fmt::print("got {} tilemaps!\n", tilemaps.size());
   fmt::print("x: {}, y: {}\n", tilemaps[0].size.x, tilemaps[0].size.y);
+
 
   Texture texs [] =
     { Texture ("res/tilesets/girder.png")
@@ -509,5 +511,14 @@ void framebuffer_size_callback(GLFWwindow*, int width, int height)
 void key_callback (GLFWwindow * win, int key, int scancode, int action, int mods)
 {
   global::keymap.put (global::ticks_elapsed, key,scancode,action,mods);
+
+  {
+    Key key = 'N';
+    if (key.fresh (1))
+    {
+      player.pos = V2 <float> { 100 + 5, 100 + 3 };
+    }
+  }
+
 }
 

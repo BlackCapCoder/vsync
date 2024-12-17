@@ -39,6 +39,7 @@ namespace global
   }
 
   const tick_t intended_ticks_per_sec = 144;
+  /*const tick_t intended_ticks_per_sec = 80;*/
   const secs intended_tick_time = 1.0 / intended_ticks_per_sec;
 
   static secs tick_mult ()

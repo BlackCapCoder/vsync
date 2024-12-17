@@ -458,3 +458,32 @@ std::vector<TileMapEx> load_tilemaps (const char * pth)
   return v;
 }
 
+TileMapEx boring_screen (V2<int> pos, V2<int> size)
+{
+  tile_t * buf = reinterpret_cast<tile_t *>(calloc(size.w*size.h, 1));
+
+  int ox = 2;
+  int oy = 7;
+  int s = 9;
+  float len = s+4;
+  float ylen = 5;
+
+  while (ox + s < size.w && oy < size.y)
+  {
+    for (int x = 0; x < s; x++)
+      buf[oy*size.w + x + ox] = 1;
+
+    ox += len;
+    oy += ylen;
+    len *= 1.18;
+    /*ylen *= 1.05;*/
+    /*if (i >= 8) oy--;*/
+  }
+
+  for (int x = 0; x < size.w; x++)
+    buf[size.h*size.w - size.w + x] = 1;
+
+  const TileMap tm {.pos=pos, .size=size, .tiles=buf};
+  TileMapEx tmx (tm);
+  return tmx;
+}
